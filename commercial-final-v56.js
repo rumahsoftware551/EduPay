@@ -15,9 +15,26 @@
     if(b.logoUrl){document.querySelectorAll('.logo-mark').forEach(el=>{el.classList.add('school-logo-v56');el.textContent='';el.style.backgroundImage=`url("${String(b.logoUrl).replaceAll('"','%22')}")`})}
   };
 
+  function normalizeReadinessV56(m,r){
+    const out={...(r||{})};
+    const restorePass=m?.restoreVerification?.ok===true;
+    out.checks=(out.checks||[]).map(c=>c.key==='restore_verified'?{...c,pass:restorePass}:c);
+    const required=out.checks.filter(c=>c.required);
+    const passed=required.filter(c=>c.pass).length;
+    out.score=required.length?Math.round((passed/required.length)*100):100;
+    out.ready=out.score===100;
+    return out;
+  }
+
   window.loadCommercialV56=async function({forceRender=false}={}){
     if(!session||session.role!=='admin'||V.loading)return null;V.loading=true;
-    try{const [m,r]=await Promise.all([api56('/admin/maintenance'),api56('/admin/readiness')]);V.maintenance=m;V.readiness=r;if(forceRender&&page==='settings')render();return m}catch(err){toast(err.message||'Gagal mengambil status Commercial Master');return null}finally{V.loading=false}
+    try{
+      const [m,r]=await Promise.all([api56('/admin/maintenance'),api56('/admin/readiness')]);
+      V.maintenance=m;
+      V.readiness=normalizeReadinessV56(m,r);
+      if(forceRender&&page==='settings')render();
+      return m;
+    }catch(err){toast(err.message||'Gagal mengambil status Commercial Master');return null}finally{V.loading=false}
   };
   function size56(n){n=Number(n||0);if(n<1024)return `${n} B`;if(n<1048576)return `${(n/1024).toFixed(1)} KB`;if(n<1073741824)return `${(n/1048576).toFixed(1)} MB`;return `${(n/1073741824).toFixed(2)} GB`}
   function date56(v){if(!v)return 'Belum tersedia';const d=new Date(v);return Number.isNaN(d.getTime())?'Belum tersedia':d.toLocaleString('id-ID')}
@@ -51,7 +68,6 @@
   window.openOfficialReceiptV56=function(id){const n=Number(id);if(!n)return toast('ID kwitansi tidak valid');window.open(`/api/v1/commercial/receipts/${n}`,'_blank','noopener')};
   window.showParentReceiptV50=function(id){return openOfficialReceiptV56(id)};
 
-  // Tambahkan tombol kwitansi resmi pada ledger Finance tanpa mengganti data source V5.5.
   const paymentsBeforeV56=views.payments;
   views.payments=function(){
     let html=paymentsBeforeV56();
