@@ -56,7 +56,7 @@ WITH target_school AS (
 ), payment_summary AS (
   SELECT
     COALESCE(SUM(CASE WHEN COALESCE(voided,FALSE)=FALSE AND paid_at::date=CURRENT_DATE THEN amount ELSE 0 END),0) today,
-    COALESCE(SUM(CASE WHEN COALESCE(voided,FALSE)=FALSE AND date_trunc('month',paid_at)=date_trunc('month',CURRENT_TIMESTAMP) THEN amount ELSE 0 END),0) month
+    COALESCE(SUM(CASE WHEN COALESCE(voided,FALSE)=FALSE AND date_trunc('month',paid_at)=date_trunc('month',CURRENT_TIMESTAMP) THEN amount ELSE 0 END),0) AS month_amount
   FROM payments WHERE school_id=(SELECT id FROM target_school)
 )
 SELECT
@@ -66,7 +66,7 @@ SELECT
   (SELECT unpaid_amount FROM bill_summary) unpaid,
   (SELECT pending_count FROM bill_summary) pending,
   (SELECT today FROM payment_summary) today,
-  (SELECT month FROM payment_summary) month,
+  (SELECT month_amount FROM payment_summary) month_amount,
   (SELECT COUNT(*) FROM students WHERE school_id=(SELECT id FROM target_school) AND active=TRUE) active_students,
   (SELECT COUNT(*) FROM bills WHERE school_id=(SELECT id FROM target_school)) bills,
   (SELECT COUNT(*) FROM payments WHERE school_id=(SELECT id FROM target_school)) payments;
@@ -79,6 +79,7 @@ php -l "$APP_DIR/backend/v1.php" >/dev/null
 grep -q 'portal-state-v551.js?v=5.5.2' "$APP_DIR/index.html" || { echo 'ERROR: index belum V5.5.2' >&2; exit 1; }
 grep -q 'edupay-professional-v5.5.2' "$APP_DIR/sw.js" || { echo 'ERROR: service worker belum V5.5.2' >&2; exit 1; }
 grep -q "v552.php" "$APP_DIR/backend/v551.php" || { echo 'ERROR: portal proxy belum memakai V5.5.2' >&2; exit 1; }
+grep -q "month_amount" "$APP_DIR/backend/v552.php" || { echo 'ERROR: dashboard SQL alias fix belum terpasang' >&2; exit 1; }
 
 printf '[6/7] Restart PHP and reload Nginx...\n'
 sudo systemctl restart "php${PHP_VER}-fpm"
