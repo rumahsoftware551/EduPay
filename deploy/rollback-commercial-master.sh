@@ -17,15 +17,20 @@ DB_PASSWORD="$(php -r '$c=require $argv[1];echo $c["db"]["password"];' "$CONFIG_
 DB_DSN="$(php -r '$c=require $argv[1];echo $c["db"]["dsn"];' "$CONFIG_FILE")"
 DB_NAME="$(printf '%s' "$DB_DSN"|sed -n 's/.*dbname=\([^;]*\).*/\1/p')"
 PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+PHP_SERVICE="php${PHP_VER}-fpm"
 
 printf 'ROLLBACK TARGET\nBackup : %s\nDatabase: %s\nCommit : %s\n' "$BACKUP_DIR" "$DB_NAME" "${TARGET_COMMIT:-tidak diubah}"
 
-# Safety backup current state before destructive restore.
 chmod +x "$APP_DIR/deploy/backup-edupay.sh"
 "$APP_DIR/deploy/backup-edupay.sh"
 
-sudo systemctl stop "php${PHP_VER}-fpm"
-trap 'sudo systemctl start "php'"$PHP_VER"'-fpm" >/dev/null 2>&1 || true' EXIT
+SERVICE_STOPPED=0
+recover_service(){
+  if [ "$SERVICE_STOPPED" = 1 ]; then sudo systemctl start "$PHP_SERVICE" >/dev/null 2>&1 || true; fi
+}
+trap recover_service EXIT
+sudo systemctl stop "$PHP_SERVICE"
+SERVICE_STOPPED=1
 
 sudo -u postgres dropdb --if-exists "$DB_NAME"
 sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
@@ -48,7 +53,8 @@ if [ -n "$TARGET_COMMIT" ]; then
   git -C "$APP_DIR" reset --hard "$TARGET_COMMIT"
 fi
 
-sudo systemctl start "php${PHP_VER}-fpm"
+sudo systemctl start "$PHP_SERVICE"
+SERVICE_STOPPED=0
 sudo nginx -t
 sudo systemctl reload nginx
 trap - EXIT
