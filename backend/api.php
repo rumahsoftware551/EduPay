@@ -74,6 +74,14 @@ function requireUser(array $roles = []): array {
     if ($roles && !in_array($u['role'], $roles, true)) respond(403, ['ok'=>false,'message'=>'Akses ditolak']);
     return $u;
 }
+function issueGuardianToken(PDO $pdo, int $schoolId, int $uid, int $adminId): string {
+    $code = (string)random_int(100000,999999);
+    $hash = hash('sha256',$code);
+    $pdo->prepare('UPDATE activation_tokens SET used_at=NOW() WHERE user_id=? AND used_at IS NULL')->execute([$uid]);
+    $pdo->prepare("INSERT INTO activation_tokens(school_id,user_id,token_hash,expires_at,created_by) VALUES(?,?,?,NOW()+INTERVAL '24 hours',?)")
+        ->execute([$schoolId,$uid,$hash,$adminId]);
+    return $code;
+}
 
 $pdo = db($config);
 $schoolId = currentSchoolId($pdo, $config);
@@ -147,6 +155,7 @@ if ($path === '/api/auth/activate' && $method === 'POST') {
     $stmt->execute([$schoolId,$phone]);
     $row = $stmt->fetch();
     if (!$row) respond(404,['ok'=>false,'message'=>'Belum ada undangan aktivasi yang aktif']);
+    if ($row['status']==='disabled') respond(403,['ok'=>false,'message'=>'Akun dinonaktifkan. Hubungi admin sekolah.']);
     if (strtotime($row['expires_at']) < time()) respond(410,['ok'=>false,'message'=>'Kode aktivasi sudah kedaluwarsa']);
     if (!hash_equals($row['token_hash'], hash('sha256',$code))) respond(422,['ok'=>false,'message'=>'Kode aktivasi tidak sesuai']);
     $pdo->beginTransaction();
@@ -164,6 +173,29 @@ if ($path === '/api/auth/activate' && $method === 'POST') {
     respond(200,['ok'=>true,'message'=>'Akun berhasil diaktifkan']);
 }
 
+if ($path === '/api/admin/guardians' && $method === 'GET') {
+    requireUser(['admin']);
+    $stmt = $pdo->prepare("SELECT u.id,u.name,u.username,u.status,u.locked_until,u.activated_at,u.last_login_at,
+        (SELECT MAX(t.created_at) FROM activation_tokens t WHERE t.user_id=u.id) AS last_invite_at,
+        (SELECT MAX(t.expires_at) FROM activation_tokens t WHERE t.user_id=u.id AND t.used_at IS NULL) AS invite_expires_at,
+        COALESCE(json_agg(json_build_object('id',s.id,'name',s.name,'nis',s.nis,'className',c.name) ORDER BY s.name) FILTER (WHERE s.id IS NOT NULL),'[]'::json) AS students
+        FROM users u
+        LEFT JOIN guardian_students gs ON gs.guardian_user_id=u.id
+        LEFT JOIN students s ON s.id=gs.student_id AND s.active=TRUE
+        LEFT JOIN classes c ON c.id=s.class_id
+        WHERE u.school_id=? AND u.role='parent'
+        GROUP BY u.id
+        ORDER BY u.name,u.id");
+    $stmt->execute([$schoolId]);
+    $rows=$stmt->fetchAll();
+    foreach($rows as &$r){
+        $r['id']=(int)$r['id'];
+        if(is_string($r['students'])) $r['students']=json_decode($r['students'],true) ?: [];
+    }
+    unset($r);
+    respond(200,['ok'=>true,'guardians'=>$rows,'server_time'=>date(DATE_ATOM)]);
+}
+
 if ($path === '/api/admin/guardians/sync' && $method === 'POST') {
     $admin = requireUser(['admin']);
     $stmt = $pdo->prepare("SELECT guardian_phone,MAX(guardian_name) guardian_name FROM students WHERE school_id=? AND active=TRUE AND guardian_phone IS NOT NULL AND guardian_phone<>'' GROUP BY guardian_phone");
@@ -174,7 +206,8 @@ if ($path === '/api/admin/guardians/sync' && $method === 'POST') {
         $phone=normalizePhone($r['guardian_phone']); if(!$phone) continue;
         $stmt=$pdo->prepare("SELECT id FROM users WHERE school_id=? AND role='parent' AND username=?");$stmt->execute([$schoolId,$phone]);$uid=$stmt->fetchColumn();
         if(!$uid){$stmt=$pdo->prepare("INSERT INTO users(school_id,name,username,role,status) VALUES(?,?,?,'parent','not_invited') RETURNING id");$stmt->execute([$schoolId,$r['guardian_name']?:'Wali Murid',$phone]);$uid=$stmt->fetchColumn();$created++;}
-        $stmt=$pdo->prepare('SELECT id FROM students WHERE school_id=? AND active=TRUE AND guardian_phone=?');$stmt->execute([$schoolId,$r['guardian_phone']]);
+        $stmt=$pdo->prepare("UPDATE users SET name=?,updated_at=NOW() WHERE id=?");$stmt->execute([$r['guardian_name']?:'Wali Murid',$uid]);
+        $stmt=$pdo->prepare('SELECT id FROM students WHERE school_id=? AND active=TRUE AND guardian_phone=?');$stmt->execute([$schoolId,$phone]);
         foreach($stmt->fetchAll() as $s){$ins=$pdo->prepare('INSERT INTO guardian_students(guardian_user_id,student_id) VALUES(?,?) ON CONFLICT DO NOTHING');$ins->execute([$uid,$s['id']]);$linked += $ins->rowCount();}
     }
     audit($pdo,$schoolId,(int)$admin['id'],'guardian.sync',null,null,['created'=>$created,'linked'=>$linked]);
@@ -185,16 +218,52 @@ if (preg_match('#^/api/admin/guardians/(\d+)/invite$#',$path,$m) && $method === 
     $admin=requireUser(['admin']);$uid=(int)$m[1];
     $stmt=$pdo->prepare("SELECT * FROM users WHERE id=? AND school_id=? AND role='parent'");$stmt->execute([$uid,$schoolId]);$u=$stmt->fetch();
     if(!$u) respond(404,['ok'=>false,'message'=>'Akun wali tidak ditemukan']);
-    $code=(string)random_int(100000,999999);$hash=hash('sha256',$code);
+    if($u['status']==='active') respond(409,['ok'=>false,'message'=>'Akun wali sudah aktif. Gunakan Reset Akses jika wali lupa password.']);
+    if($u['status']==='disabled') respond(409,['ok'=>false,'message'=>'Akun sedang nonaktif. Aktifkan akun terlebih dahulu.']);
     $pdo->beginTransaction();
     try{
-        $pdo->prepare('UPDATE activation_tokens SET used_at=NOW() WHERE user_id=? AND used_at IS NULL')->execute([$uid]);
-        $pdo->prepare("INSERT INTO activation_tokens(school_id,user_id,token_hash,expires_at,created_by) VALUES(?,?,?,NOW()+INTERVAL '24 hours',?)")->execute([$schoolId,$uid,$hash,$admin['id']]);
-        $pdo->prepare("UPDATE users SET status='invited',password_hash=NULL,updated_at=NOW() WHERE id=?")->execute([$uid]);
+        $code=issueGuardianToken($pdo,$schoolId,$uid,(int)$admin['id']);
+        $pdo->prepare("UPDATE users SET status='invited',updated_at=NOW() WHERE id=?")->execute([$uid]);
         $pdo->commit();
     }catch(Throwable $e){$pdo->rollBack();throw $e;}
     audit($pdo,$schoolId,(int)$admin['id'],'guardian.invite','user',(string)$uid);
     respond(200,['ok'=>true,'username'=>$u['username'],'name'=>$u['name'],'code'=>$code,'expires_hours'=>24]);
+}
+
+if (preg_match('#^/api/admin/guardians/(\d+)/reset$#',$path,$m) && $method === 'POST') {
+    $admin=requireUser(['admin']);$uid=(int)$m[1];
+    $stmt=$pdo->prepare("SELECT * FROM users WHERE id=? AND school_id=? AND role='parent'");$stmt->execute([$uid,$schoolId]);$u=$stmt->fetch();
+    if(!$u) respond(404,['ok'=>false,'message'=>'Akun wali tidak ditemukan']);
+    if($u['status']!=='active') respond(409,['ok'=>false,'message'=>'Reset Akses hanya tersedia untuk akun yang sudah aktif.']);
+    $pdo->beginTransaction();
+    try{
+        $code=issueGuardianToken($pdo,$schoolId,$uid,(int)$admin['id']);
+        $pdo->prepare("UPDATE users SET status='invited',password_hash=NULL,failed_attempts=0,locked_until=NULL,updated_at=NOW() WHERE id=?")->execute([$uid]);
+        $pdo->commit();
+    }catch(Throwable $e){$pdo->rollBack();throw $e;}
+    audit($pdo,$schoolId,(int)$admin['id'],'guardian.reset_access','user',(string)$uid);
+    respond(200,['ok'=>true,'username'=>$u['username'],'name'=>$u['name'],'code'=>$code,'expires_hours'=>24]);
+}
+
+if (preg_match('#^/api/admin/guardians/(\d+)/status$#',$path,$m) && $method === 'POST') {
+    $admin=requireUser(['admin']);$uid=(int)$m[1];$in=jsonInput();
+    $enabled=(bool)($in['enabled']??false);
+    $stmt=$pdo->prepare("SELECT * FROM users WHERE id=? AND school_id=? AND role='parent'");$stmt->execute([$uid,$schoolId]);$u=$stmt->fetch();
+    if(!$u) respond(404,['ok'=>false,'message'=>'Akun wali tidak ditemukan']);
+    if(!$enabled){
+        $pdo->beginTransaction();
+        try{
+            $pdo->prepare("UPDATE users SET status='disabled',locked_until=NULL,updated_at=NOW() WHERE id=?")->execute([$uid]);
+            $pdo->prepare('UPDATE activation_tokens SET used_at=NOW() WHERE user_id=? AND used_at IS NULL')->execute([$uid]);
+            $pdo->commit();
+        }catch(Throwable $e){$pdo->rollBack();throw $e;}
+        audit($pdo,$schoolId,(int)$admin['id'],'guardian.disabled','user',(string)$uid);
+        respond(200,['ok'=>true,'status'=>'disabled']);
+    }
+    $newStatus = $u['password_hash'] ? 'active' : 'not_invited';
+    $pdo->prepare('UPDATE users SET status=?,updated_at=NOW() WHERE id=?')->execute([$newStatus,$uid]);
+    audit($pdo,$schoolId,(int)$admin['id'],'guardian.enabled','user',(string)$uid,['status'=>$newStatus]);
+    respond(200,['ok'=>true,'status'=>$newStatus]);
 }
 
 if ($path === '/api/admin/bootstrap' && $method === 'POST') {
