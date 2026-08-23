@@ -12,7 +12,7 @@ LOG_DIR="/var/log/edupay"
 for F in api.php v49.php v50.php v501.php v502.php v51.php v52.php v53.php v1.php; do
   [ -f "$APP_DIR/backend/$F" ] || { echo "ERROR: backend/$F tidak ditemukan" >&2; exit 1; }
 done
-for F in production-runtime-v54.js api-gateway-shim-v54.js security-core-v54.js; do
+for F in production-runtime-v54.js api-gateway-shim-v54.js security-core-v54.js commercial-cleanup-v54.js; do
   [ -f "$APP_DIR/$F" ] || { echo "ERROR: $F tidak ditemukan" >&2; exit 1; }
 done
 
@@ -38,7 +38,7 @@ sudo chown -R www-data:adm "$LOG_DIR"
 sudo chmod 750 "$LOG_DIR"
 sudo chmod 640 "$LOG_DIR/app.log"
 
-printf '[3/8] Configure unified API v1 route...\n'
+printf '[3/8] Configure unified API v1 route and legacy deny...\n'
 sudo tee /etc/nginx/snippets/edupay-v1.conf >/dev/null <<NGINX
 location ^~ /api/v1/ {
     include fastcgi_params;
@@ -49,13 +49,17 @@ location ^~ /api/v1/ {
     fastcgi_read_timeout 60s;
     client_max_body_size 6m;
 }
+
+# Security boundary: only API v1 is public. Old PHP handlers are internal compatibility code.
+location ^~ /api/ {
+    return 404;
+}
 NGINX
 if ! grep -q 'snippets/edupay-v1.conf' "$SITE"; then
   sudo sed -i '/server_name edupay\.rumahsoftware\.site;/a\\    include snippets/edupay-v1.conf;' "$SITE"
 fi
 
-printf '[4/8] Disable public legacy API routes...\n'
-# Legacy handlers remain on disk for internal dispatch/rollback, but are no longer reachable directly from the web.
+printf '[4/8] Remove direct legacy API includes...\n'
 sudo sed -i -E '/include snippets\/edupay-(api|v44|v46|v47|v48|v49|v50|v501|v502|v51|v52|v53)\.conf;/d' "$SITE"
 
 printf '[5/8] Enable production security headers...\n'
@@ -76,7 +80,9 @@ php -l "$APP_DIR/backend/v1.php" >/dev/null
 if grep -q 'src="app.js' "$APP_DIR/index.html"; then echo 'ERROR: index.html masih memuat app.js demo' >&2; exit 1; fi
 if [ -f "$APP_DIR/app.js" ]; then echo 'ERROR: app.js legacy masih ada di working tree. Pastikan git reset --hard origin/main sudah dijalankan.' >&2; exit 1; fi
 if grep -Eq 'admin123|finance123|wali123' "$APP_DIR/production-runtime-v54.js"; then echo 'ERROR: credential demo ditemukan pada production runtime' >&2; exit 1; fi
-for A in production-runtime-v54.js api-gateway-shim-v54.js security-core-v54.js; do grep -q "$A" "$APP_DIR/index.html" || { echo "ERROR: $A belum aktif pada index.html" >&2; exit 1; }; done
+for A in production-runtime-v54.js api-gateway-shim-v54.js commercial-cleanup-v54.js security-core-v54.js; do
+  grep -q "$A" "$APP_DIR/index.html" || { echo "ERROR: $A belum aktif pada index.html" >&2; exit 1; }
+done
 
 printf '[7/8] Validate and reload Nginx/PHP...\n'
 sudo systemctl restart "php${PHP_VER}-fpm"
@@ -88,7 +94,7 @@ sleep 2
 curl -fsS https://edupay.rumahsoftware.site/api/v1/health; echo
 printf 'Security headers:\n'
 curl -fsSI https://edupay.rumahsoftware.site/ | grep -Ei 'strict-transport-security|content-security-policy|x-frame-options|x-content-type-options' || true
-printf 'Legacy POST route check (expected non-JSON/404):\n'
 LEGACY_CODE="$(curl -s -o /dev/null -w '%{http_code}' -X POST https://edupay.rumahsoftware.site/api/v50/finance/bills/1/pay || true)"
-echo "Legacy direct POST HTTP: $LEGACY_CODE"
+printf 'Legacy direct POST HTTP: %s (expected 404)\n' "$LEGACY_CODE"
+if [ "$LEGACY_CODE" != "404" ]; then echo 'WARNING: route legacy belum tertutup sempurna. Periksa nginx -T.' >&2; fi
 printf '\nEduPay V5.4 Security & Core Consolidation selesai.\nBackup: %s\nLog: %s\n' "$BACKUP_FILE" "$LOG_DIR/app.log"
