@@ -40,7 +40,7 @@ function createPayment50(PDO $pdo,int $schoolId,array $u,array $bill,string $met
   $external='server:'.$receipt;
   $q=$pdo->prepare('INSERT INTO payments(school_id,external_id,bill_id,student_id,amount,method,paid_at,verified_by,receipt,voided) VALUES(?,?,?,?,?,?,NOW(),?,?,FALSE) RETURNING id,paid_at');
   $q->execute([$schoolId,$external,$bill['id'],$bill['student_id'],$bill['amount'],$method,$u['id'],$receipt]);$p=$q->fetch();
-  $pdo->prepare('UPDATE bills SET status=\'paid\',payment_method=?,updated_at=NOW() WHERE id=?')->execute([$method,$bill['id']]);
+  $pdo->prepare("UPDATE bills SET status='paid',payment_method=?,updated_at=NOW() WHERE id=?")->execute([$method,$bill['id']]);
   audit50($pdo,$schoolId,(int)$u['id'],'payment.created','payment',(string)$p['id'],['bill_id'=>(int)$bill['id'],'receipt'=>$receipt,'method'=>$method,'amount'=>(float)$bill['amount']]);
   notifyStudent50($pdo,$schoolId,(int)$bill['student_id'],'payment','Pembayaran dikonfirmasi','Pembayaran '.$bill['title'].' sebesar Rp '.number_format((float)$bill['amount'],0,',','.').' telah dikonfirmasi lunas.','payment',(string)$p['id']);
   return ['id'=>(int)$p['id'],'receipt'=>$receipt,'paid_at'=>$p['paid_at'],'amount'=>(float)$bill['amount'],'method'=>$method];
@@ -54,8 +54,14 @@ if(preg_match('#^/api/v50/finance/bills/(\d+)/pay$#',$path,$m)&&$method==='POST'
   $u=finance50();$in=input50();$billId=(int)$m[1];$payMethod=trim((string)($in['method']??'Cash'));
   if(!in_array($payMethod,['Cash','Transfer','QRIS'],true))r50(422,['ok'=>false,'message'=>'Metode pembayaran tidak valid']);
   $pdo->beginTransaction();
-  try{$bill=billLock50($pdo,$schoolId,$billId);$payment=createPayment50($pdo,$schoolId,$u,$bill,$payMethod);$pdo->commit();r50(200,['ok'=>true,'message'=>'Pembayaran berhasil dicatat','payment'=>$payment]);}
-  catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($e instanceof PDOException)r50(500,['ok'=>false,'message'=>'Transaksi database gagal']);throw$e;}
+  try{
+    $bill=billLock50($pdo,$schoolId,$billId);
+    if($bill['status']==='pending'){
+      if($payMethod!=='Transfer')r50(409,['ok'=>false,'message'=>'Tagihan sedang menunggu verifikasi transfer. Terima atau Tolak bukti terlebih dahulu.']);
+      if(trim((string)$bill['proof_name'])==='')r50(409,['ok'=>false,'message'=>'Bukti transfer belum tersedia']);
+    }
+    $payment=createPayment50($pdo,$schoolId,$u,$bill,$payMethod);$pdo->commit();r50(200,['ok'=>true,'message'=>'Pembayaran berhasil dicatat','payment'=>$payment]);
+  }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($e instanceof PDOException)r50(500,['ok'=>false,'message'=>'Transaksi database gagal']);throw$e;}
 }
 
 if(preg_match('#^/api/v50/finance/bills/(\d+)/approve$#',$path,$m)&&$method==='POST'){
