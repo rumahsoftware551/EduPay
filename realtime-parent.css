@@ -1,0 +1,17 @@
+/* EduPay V4.4 realtime parent UI */
+.notification-bell-v44{position:relative}
+.notification-count-v44{position:absolute;right:-5px;top:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#dc4b55;color:#fff;border:2px solid #fff;font-size:8px;font-weight:900;display:grid;place-items:center;line-height:1}
+.notification-list-v44{display:grid;gap:8px;max-height:420px;overflow:auto}
+.notification-item-v44{width:100%;display:grid;grid-template-columns:9px 1fr;gap:10px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px;cursor:pointer;color:var(--text)}
+.notification-item-v44.unread{background:#f6f9ff;border-color:#dbe8ff}
+.notification-mark-v44{width:7px;height:7px;border-radius:50%;background:#cbd5e1;margin-top:5px}
+.notification-item-v44.unread .notification-mark-v44{background:var(--primary)}
+.notification-item-v44 b{display:block;font-size:11px;color:#263449}
+.notification-item-v44 p{margin:3px 0 5px;font-size:10px;line-height:1.45;color:#66758b}
+.notification-item-v44 small{font-size:8px;color:#9aa5b5}
+
+@media(max-width:720px){
+  .notification-count-v44{right:-4px;top:-4px}
+  .notification-list-v44{max-height:360px}
+  .notification-item-v44{padding:10px}
+}
