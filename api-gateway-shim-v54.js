@@ -1,4 +1,4 @@
-// EduPay V5.4 - Early API gateway shim.
+// EduPay V5.4+ - Early API gateway shim.
 // Loaded before compatibility modules so even legacy fetch() calls go through /api/v1.
 (function(){
   const originalFetch=window.fetch.bind(window);window.EDUPAY_ORIGINAL_FETCH=originalFetch;
@@ -17,8 +17,9 @@
     else if(b.startsWith('/api/v44/admin/guardians/'))m='/api/v1/admin/guardians/'+b.slice('/api/v44/admin/guardians/'.length);
     else if(b==='/api/v44/admin/guardians'||b==='/api/v501/admin/guardians')m='/api/v1/admin/guardians';
     else if(b.startsWith('/api/v501/admin/guardians/'))m='/api/v1/admin/guardians/'+b.slice('/api/v501/admin/guardians/'.length);
-    else if(b==='/api/v49/state')m='/api/v1/staff/state';
-    else if(b==='/api/v49/sync-all')m='/api/v1/staff/sync-all';
+    // V5.5: never allow compatibility code to pull/push a full browser snapshot.
+    else if(b==='/api/v49/state')m='/api/v1/scale/compat/state';
+    else if(b==='/api/v49/sync-all')m='/api/v1/scale/compat/sync-all';
     else if(b.startsWith('/api/v50/finance/'))m='/api/v1/finance/'+b.slice('/api/v50/finance/'.length);
     else if(b==='/api/v50/parent/payments')m='/api/v1/parent/payments';
     else if(b==='/api/v502/verification')m='/api/v1/verification';
@@ -29,6 +30,8 @@
     else if(b==='/api/v52/notifications/read')m='/api/v1/staff/notifications/read';
     else if(b==='/api/v53/csrf')m='/api/v1/csrf';
     else if(b==='/api/v53/health')m='/api/v1/health';
+    // V5.5: legacy V5.3 state call is reduced to small master data only.
+    else if(b==='/api/v53/admin/state')m='/api/v1/scale/admin/master';
     else if(b.startsWith('/api/v53/admin/'))m='/api/v1/admin/'+b.slice('/api/v53/admin/'.length);
     return m+q;
   }
