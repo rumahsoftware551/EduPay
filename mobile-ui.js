@@ -1,5 +1,6 @@
-// EduPay V4.3 - mobile shell improvements
+// EduPay V4.6 - mobile shell improvements + support contact
 const logoutIconV43='<span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg></span>';
+const EDUPAY_SUPPORT_EMAIL='rumahsoftwarenetwork551@gmail.com';
 
 shell=function(content){
   const items=nav();
@@ -10,7 +11,7 @@ shell=function(content){
       <div class="sidebar-brand">${edupayLogo}<div><strong>EduPay</strong><span>School Finance</span></div></div>
       <div class="nav-title">Menu Utama</div>
       <div class="nav-list">${items.map(([p,l])=>`<button class="nav-btn ${page===p?'active':''}" onclick="go('${p}')">${navIcon(p)}<span>${l}</span>${p==='verification'&&pending?`<em>${pending}</em>`:''}</button>`).join('')}</div>
-      <div class="sidebar-help"><div class="help-icon">?</div><div><b>Butuh bantuan?</b><small>Hubungi admin sekolah jika ada kendala pembayaran.</small></div></div>
+      <div class="sidebar-help"><div class="help-icon">?</div><div><b>Butuh bantuan?</b><small>Email support:</small><a class="support-email-v46" href="mailto:${EDUPAY_SUPPORT_EMAIL}">${EDUPAY_SUPPORT_EMAIL}</a></div></div>
       <button class="sidebar-user" onclick="logout()"><div class="avatar">${esc(session.name[0])}</div><div><b>${esc(session.name)}</b><span>${role()}</span></div><span>↪</span></button>
     </aside>
     <div class="content-shell">
