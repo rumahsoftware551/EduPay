@@ -3,7 +3,7 @@
   "short_name":"EduPay",
   "start_url":"./index.html",
   "display":"standalone",
-  "background_color":"#f6f8fc",
-  "theme_color":"#2563eb",
+  "background_color":"#f6fbf7",
+  "theme_color":"#72c98e",
   "description":"Platform administrasi pembayaran sekolah untuk Administrator, Finance/Bendahara, dan Orang Tua/Wali dengan PostgreSQL, verifikasi pembayaran, kwitansi digital, laporan, notifikasi, serta backup terkelola."
 }
