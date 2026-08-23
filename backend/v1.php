@@ -36,7 +36,7 @@ elseif($path==='/api/v1/commercial/admin/logo'){$script='v56.php';$target='/api/
 elseif(preg_match('#^/api/v1/commercial/receipts/(\d+)$#',$path,$m)){$script='v56.php';$target='/api/v56/receipts/'.$m[1];}
 elseif($path==='/api/v1/scale/meta'){$script='v55.php';$target='/api/v55/meta';}
 elseif($path==='/api/v1/scale/admin/master'){$script='v55.php';$target='/api/v55/admin/master';}
-elseif($path==='/api/v1/scale/dashboard'){$script='v55.php';$target='/api/v55/dashboard';}
+elseif($path==='/api/v1/scale/dashboard'){$script='v56scale.php';$target='/api/v56scale/dashboard';}
 elseif($path==='/api/v1/scale/students'){$script='v55.php';$target='/api/v55/students';}
 elseif($path==='/api/v1/scale/students/lookup'){$script='v55.php';$target='/api/v55/students/lookup';}
 elseif($path==='/api/v1/scale/guardians'){$script='v55.php';$target='/api/v55/guardians';}
