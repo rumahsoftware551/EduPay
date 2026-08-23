@@ -1,0 +1,114 @@
+/* EduPay V5.7 — Light Green Brand Theme
+   Loaded last so the visual refresh is isolated from legacy modules.
+*/
+:root{
+  --bg:#f6fbf7;
+  --surface:#ffffff;
+  --surface-soft:#f8fcf9;
+  --text:#17251d;
+  --heading:#102017;
+  --muted:#708078;
+  --line:#dfebe3;
+  --line-strong:#cfdfd4;
+  --primary:#72c98e;
+  --primary-dark:#409f63;
+  --primary-soft:#eaf8ef;
+  --success:#2f9b61;
+  --success-soft:#e9f8ef;
+  --shadow-sm:0 4px 14px rgba(39,103,66,.06);
+}
+
+html,body{background:var(--bg)}
+body{color:var(--text)}
+
+.login-wrap{
+  background:
+    radial-gradient(circle at 10% 10%,rgba(114,201,142,.16),transparent 34%),
+    radial-gradient(circle at 88% 88%,rgba(154,224,175,.16),transparent 31%),
+    #f7fbf8;
+}
+.login-visual{
+  background:linear-gradient(145deg,#174f37 0%,#2d8354 52%,#72c98e 100%);
+}
+
+/* Wallet logo — replaces the old letter E without touching runtime markup. */
+.logo-mark,
+.logo-mark-light{
+  color:transparent!important;
+  text-indent:-9999px;
+  overflow:hidden;
+  background-image:url('assets/edupay-logo.svg?v=5.7.0')!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  background-size:100% 100%!important;
+  box-shadow:0 8px 20px rgba(64,159,99,.16)!important;
+}
+.logo-mark-light{
+  border:1px solid rgba(255,255,255,.24)!important;
+  box-shadow:0 8px 22px rgba(8,60,34,.16)!important;
+}
+
+.login-heading>span,.page-kicker{color:var(--primary-dark)}
+.field:focus{
+  border-color:#8ad3a2;
+  box-shadow:0 0 0 4px rgba(114,201,142,.14);
+}
+.btn-primary{
+  background:linear-gradient(145deg,var(--primary),var(--primary-dark));
+  color:#fff;
+  box-shadow:0 8px 20px rgba(64,159,99,.20);
+}
+.btn-primary:hover{filter:saturate(1.04) brightness(.98)}
+.btn-soft{background:var(--primary-soft);color:#287c4a}
+
+.nav-btn:hover{background:#f3faf5;color:#23432f}
+.nav-btn.active{
+  background:linear-gradient(90deg,#e6f7ec,#f2fbf5);
+  color:#2c8450;
+}
+.nav-btn.active:before{background:var(--primary)}
+.sidebar-help{
+  background:linear-gradient(145deg,#f4fbf6,#eef9f2);
+  border-color:#dcefe3;
+}
+.help-icon{background:#dff4e6;color:#348c56}
+.avatar{
+  background:linear-gradient(145deg,#e7f7ed,#d7f0e0);
+  color:#2e8350;
+}
+
+.icon-btn:hover{border-color:#cfe4d6;background:#f6fbf7;color:#348c56}
+.notification-dot{box-shadow:0 0 0 2px #fff}
+
+.stat-blue .stat-icon{background:#e8f7ed;color:#3a9660}
+.stat-green .stat-icon{background:#e7f7ed;color:#2f935b}
+.badge.info{background:#e8f7ed;color:#2f8150}
+
+.welcome-card,.notice{
+  border-color:#d7eadf;
+  background:linear-gradient(145deg,#f0faf3,#f8fcf9);
+  color:#3d6e51;
+}
+.welcome-icon{background:#dcf2e4;color:#34915a}
+.welcome-card b{color:#2d6445}
+.welcome-card p{color:#688273}
+
+.table tbody tr:hover{background:#f7fbf8}
+.table th{background:#f5faf6}
+
+.mobile-nav>button.active{
+  background:#e9f8ee!important;
+  color:#2f8350!important;
+}
+
+/* Common versioned module accents */
+.commercial-title-v56 span{color:#3b9660}
+.school-logo-v56{border-color:#d7e8dc!important}
+
+/* Keep semantic colors for warning/error states. */
+.badge.ok{background:#e8f7ee;color:#2e8753}
+
+@media(max-width:720px){
+  .stats .stat-card{background:#fff}
+  .topbar{background:rgba(255,255,255,.94)}
+}
