@@ -42,7 +42,7 @@ if(in_array($role,['admin','finance'],true)){
   $pay=query552('payments_summary',function()use($pdo,$schoolId){
     $q=$pdo->prepare("SELECT
       COALESCE(SUM(CASE WHEN COALESCE(voided,FALSE)=FALSE AND paid_at::date=CURRENT_DATE THEN amount ELSE 0 END),0) today,
-      COALESCE(SUM(CASE WHEN COALESCE(voided,FALSE)=FALSE AND date_trunc('month',paid_at)=date_trunc('month',CURRENT_TIMESTAMP) THEN amount ELSE 0 END),0) month
+      COALESCE(SUM(CASE WHEN COALESCE(voided,FALSE)=FALSE AND date_trunc('month',paid_at)=date_trunc('month',CURRENT_TIMESTAMP) THEN amount ELSE 0 END),0) AS month_amount
       FROM payments WHERE school_id=?");$q->execute([$schoolId]);return$q->fetch()?:[];
   });
   $people=query552('database_counts',function()use($pdo,$schoolId){
@@ -61,7 +61,7 @@ if(in_array($role,['admin','finance'],true)){
     foreach($q->fetchAll() as$r)$rows[]=['id'=>(int)$r['id'],'receipt'=>$r['receipt'],'amount'=>(float)$r['amount'],'method'=>$r['method'],'paidAt'=>$r['paid_at'],'voided'=>(bool)$r['voided'],'studentName'=>$r['student_name'],'title'=>$r['title']];return$rows;
   });
   r552(200,['ok'=>true,'version'=>'5.5.2','role'=>$role,'schoolId'=>$schoolId,'dashboard'=>[
-    'summary'=>['totalBilled'=>(float)($bill['total_billed']??0),'paid'=>(float)($bill['paid_amount']??0),'unpaid'=>(float)($bill['unpaid_amount']??0),'pendingAmount'=>(float)($bill['pending_amount']??0),'pendingCount'=>(int)($bill['pending_count']??0),'overdueCount'=>(int)($bill['overdue_count']??0),'today'=>(float)($pay['today']??0),'month'=>(float)($pay['month']??0),'activeStudents'=>(int)($people['active_students']??0),'activeGuardians'=>(int)($people['active_guardians']??0)],
+    'summary'=>['totalBilled'=>(float)($bill['total_billed']??0),'paid'=>(float)($bill['paid_amount']??0),'unpaid'=>(float)($bill['unpaid_amount']??0),'pendingAmount'=>(float)($bill['pending_amount']??0),'pendingCount'=>(int)($bill['pending_count']??0),'overdueCount'=>(int)($bill['overdue_count']??0),'today'=>(float)($pay['today']??0),'month'=>(float)($pay['month_amount']??0),'activeStudents'=>(int)($people['active_students']??0),'activeGuardians'=>(int)($people['active_guardians']??0)],
     'latestPayments'=>$latest,'serverTime'=>date(DATE_ATOM)],
     'databaseCounts'=>['students'=>(int)($people['active_students']??0),'classes'=>(int)($people['active_classes']??0),'bills'=>(int)($people['bill_count']??0),'payments'=>(int)($people['payment_count']??0)]]);
 }
