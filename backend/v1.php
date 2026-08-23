@@ -61,8 +61,8 @@ function csrfGuardV1():void{
 
 if($path==='/api/v1/health'&&$method==='GET'){
     try{$pdo=new PDO($config['db']['dsn'],$config['db']['user'],$config['db']['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);$pdo->query('SELECT 1');}
-    catch(Throwable $e){logV1('ERROR','health_db_failed',['message'=>$e->getMessage()]);jsonV1(503,['ok'=>false,'version'=>'5.4','database'=>false,'requestId'=>$requestId]);}
-    jsonV1(200,['ok'=>true,'version'=>'5.4','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'requestId'=>$requestId]);
+    catch(Throwable $e){logV1('ERROR','health_db_failed',['message'=>$e->getMessage()]);jsonV1(503,['ok'=>false,'version'=>'5.5','database'=>false,'requestId'=>$requestId]);}
+    jsonV1(200,['ok'=>true,'version'=>'5.5','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'reports_scale'=>true,'requestId'=>$requestId]);
 }
 if($path==='/api/v1/csrf'&&$method==='GET')jsonV1(200,['ok'=>true,'token'=>(string)$_SESSION['csrf_v1'],'requestId'=>$requestId]);
 if(!in_array($method,['GET','HEAD','OPTIONS'],true))csrfGuardV1();
@@ -77,6 +77,20 @@ elseif($path==='/api/v1/admin/guardians/sync'){$script='v501.php';$target='/api/
 elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/profile$#',$path,$m)){$script='v501.php';$target='/api/v501/admin/guardians/'.$m[1].'/profile';}
 elseif($path==='/api/v1/parent/state'){$script='v501.php';$target='/api/v501/parent/state';}
 elseif($path==='/api/v1/parent/notifications/read'){$script='v501.php';$target='/api/v501/parent/notifications/read';}
+
+// V5.5 server-side pagination/reporting. Keep these before broad admin V5.3 routes.
+elseif($path==='/api/v1/scale/meta'){$script='v55.php';$target='/api/v55/meta';}
+elseif($path==='/api/v1/scale/admin/master'){$script='v55.php';$target='/api/v55/admin/master';}
+elseif($path==='/api/v1/scale/dashboard'){$script='v55.php';$target='/api/v55/dashboard';}
+elseif($path==='/api/v1/scale/students'){$script='v55.php';$target='/api/v55/students';}
+elseif($path==='/api/v1/scale/students/lookup'){$script='v55.php';$target='/api/v55/students/lookup';}
+elseif($path==='/api/v1/scale/guardians'){$script='v55.php';$target='/api/v55/guardians';}
+elseif($path==='/api/v1/scale/bills'){$script='v55.php';$target='/api/v55/bills';}
+elseif($path==='/api/v1/scale/payments'){$script='v55.php';$target='/api/v55/payments';}
+elseif($path==='/api/v1/scale/reports/summary'){$script='v55.php';$target='/api/v55/reports/summary';}
+elseif($path==='/api/v1/scale/reports/arrears'){$script='v55.php';$target='/api/v55/reports/arrears';}
+elseif(preg_match('#^/api/v1/scale/export/(payments|arrears)$#',$path,$m)){$script='v55.php';$target='/api/v55/export/'.$m[1];}
+
 elseif(preg_match('#^/api/v1/admin/(state|school|students(?:/.*)?|classes(?:/.*)?|homerooms(?:/.*)?|fees(?:/.*)?|bills(?:/.*)?)$#',$path,$m)){$script='v53.php';$target='/api/v53/admin/'.$m[1];}
 elseif($path==='/api/v1/staff/state'){$script='v49.php';$target='/api/v49/state';}
 elseif($path==='/api/v1/staff/sync-all'){$script='v49.php';$target='/api/v49/sync-all';}
