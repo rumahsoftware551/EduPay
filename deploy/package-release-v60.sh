@@ -17,16 +17,17 @@ trap 'rm -rf "$TMP"' EXIT
 ROOT="$TMP/edupay-commercial-master"
 mkdir -p "$ROOT"
 
-rsync -a "$APP_DIR/" "$ROOT/" \
-  --exclude '.git/' \
-  --exclude 'backend/config.php' \
-  --exclude '*.log' \
-  --exclude '*.sql.gz' \
-  --exclude '*.tar.gz' \
-  --exclude 'node_modules/' \
-  --exclude '.env' \
-  --exclude '.env.*' \
-  --exclude 'uploads/'
+tar -C "$APP_DIR" \
+  --exclude='./.git' \
+  --exclude='./backend/config.php' \
+  --exclude='*.log' \
+  --exclude='*.sql.gz' \
+  --exclude='*.tar.gz' \
+  --exclude='./node_modules' \
+  --exclude='./.env' \
+  --exclude='./.env.*' \
+  --exclude='./uploads' \
+  -cf - . | tar -C "$ROOT" -xf -
 
 find "$ROOT" -type f -name '*.sh' -exec chmod 755 {} +
 [ -f "$ROOT/backend/config.example.php" ] || { echo 'ERROR: config.example.php tidak ada' >&2; exit 1; }
