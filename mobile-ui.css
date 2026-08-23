@@ -1,0 +1,51 @@
+/* EduPay V4.3 - compact mobile dashboard and visible logout */
+.mobile-logout-btn{display:none}
+
+@media (max-width: 720px){
+  body{font-size:13px}
+  .content-shell{margin-left:0}
+  .sidebar{display:none}
+  .topbar{height:62px;padding:0 14px}
+  .topbar .top-user .name{display:none}
+  .topbar .avatar{width:32px;height:32px}
+  .top-title{font-size:15px}
+  .main{padding:14px 12px 88px}
+  .page-head{margin-bottom:11px;align-items:flex-start}
+  .page-head h2{font-size:20px;margin:2px 0 3px}
+  .page-head p{font-size:10px;line-height:1.35}
+  .page-kicker{font-size:8px}
+
+  .welcome-card{padding:10px 11px;margin-bottom:10px;border-radius:12px;gap:9px}
+  .welcome-icon{width:27px;height:27px;flex-basis:27px;border-radius:8px}
+  .welcome-card b{font-size:10px}
+  .welcome-card p{font-size:9px;line-height:1.35;margin-top:2px}
+
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin-bottom:10px!important}
+  .stats .stat-card{min-height:92px;padding:10px!important;border-radius:13px!important;box-shadow:none}
+  .stats .stat-top{gap:6px;font-size:9px;line-height:1.15;align-items:center}
+  .stats .stat-icon{width:23px;height:23px;border-radius:7px;font-size:8px;flex:0 0 23px}
+  .stats .stat-value{font-size:16px!important;line-height:1.1;margin-top:8px!important;white-space:normal;overflow-wrap:anywhere}
+  .stats .stat-sub{display:none}
+  .stats .stat-link{font-size:8px!important;margin-top:5px!important}
+
+  .card{border-radius:13px;padding:11px}
+  .table-card{padding:11px}
+
+  .mobile-nav{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:6px 5px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -5px 18px rgba(15,23,42,.06)}
+  .mobile-nav>button{min-width:0;height:49px;border:0;background:transparent;border-radius:10px;color:#748096;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;font-size:8px;font-weight:700;cursor:pointer}
+  .mobile-nav>button.active{background:#eef4ff;color:#1d5bd3}
+  .mobile-nav .nav-icon svg{width:18px;height:18px}
+  .mobile-nav>button>span:last-child{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mobile-nav .mobile-logout-btn{display:flex;color:#c2414d;background:#fff5f5}
+  .mobile-nav .mobile-logout-btn .nav-icon{display:inline-grid;place-items:center}
+  .mobile-nav .mobile-logout-btn .nav-icon svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+}
+
+@media (max-width: 380px){
+  .main{padding-left:9px;padding-right:9px}
+  .stats{gap:6px!important}
+  .stats .stat-card{min-height:86px;padding:9px!important}
+  .stats .stat-value{font-size:14px!important}
+  .stats .stat-top{font-size:8px}
+  .mobile-nav>button{font-size:7px}
+}
