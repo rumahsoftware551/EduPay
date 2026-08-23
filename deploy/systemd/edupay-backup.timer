@@ -1,0 +1,11 @@
+[Unit]
+Description=Run EduPay backup every night
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+RandomizedDelaySec=600
+Unit=edupay-backup.service
+
+[Install]
+WantedBy=timers.target
