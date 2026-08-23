@@ -47,8 +47,9 @@
     window.EDUPAY_V49.loading=true;
     try{
       const out=await apiV40('/api/v49/state');
-      // Never overwrite the last local source with an empty fresh server by accident.
+      // Never overwrite or push the last local source when a newly installed VPS is still empty.
       if(serverOperationalCountV49(out)===0&&localOperationalCountV49()>0){
+        window.EDUPAY_V49.ready=false;
         window.EDUPAY_V49.error='VPS masih kosong. Jalankan Migrasi Data terlebih dahulu.';
         if(!silent)toast(window.EDUPAY_V49.error);
         return out;
@@ -58,6 +59,7 @@
       if(forceRender&&changed)render();
       return out;
     }catch(err){
+      window.EDUPAY_V49.ready=false;
       window.EDUPAY_V49.error=err.message||'Gagal mengambil data VPS';
       if(!silent)toast(window.EDUPAY_V49.error);
       return null;
@@ -77,14 +79,25 @@
 
   window.syncAllServerV49=async function({silent=false,refresh=true}={}){
     if(!session||!['admin','finance'].includes(session.role)||window.EDUPAY_V49.syncing)return null;
+    // Critical safety: a browser may never push its cache until it has first accepted a server snapshot.
+    if(!window.EDUPAY_V49.ready){
+      await refreshServerStateV49({silent:true,forceRender:true});
+      if(!window.EDUPAY_V49.ready){
+        const msg=window.EDUPAY_V49.error||'Snapshot VPS belum siap. Sinkronisasi dibatalkan.';
+        if(!silent)toast(msg);
+        return null;
+      }
+    }
     window.EDUPAY_V49.syncing=true;window.EDUPAY_V49.error=null;
     try{
       const body=payloadV49();
       const out=await apiV40('/api/v49/sync-all',{method:'POST',body});
       window.EDUPAY_V49.lastPush=new Date();
+      // Release lock before pulling the canonical state back.
+      window.EDUPAY_V49.syncing=false;
       if(refresh)await refreshServerStateV49({silent:true,forceRender:false});
       if(!silent)toast('Perubahan tersimpan dan tersinkron ke VPS');
-      if(page)render();
+      render();
       return out;
     }catch(err){
       window.EDUPAY_V49.error=err.message||'Sinkronisasi VPS gagal';
@@ -93,10 +106,19 @@
     }finally{window.EDUPAY_V49.syncing=false;}
   };
 
-  // Supersede old partial sync functions so all future wrappers reach the same source of truth.
-  window.syncOperationalV44=async function({silent=true}={}){return syncAllServerV49({silent,refresh:true});};
-  window.syncStudentsServerV47=async function({silent=false}={}){const out=await syncAllServerV49({silent,refresh:true});return out?{students:db.students.length,missingGuardian:db.students.filter(s=>s.active!==false&&(!s.parent||!s.phone)).length}:null;};
-  window.syncHomeroomsV46=async function({silent=false}={}){return syncAllServerV49({silent,refresh:true});};
+  // Old V4.4 schedules a sync shortly after login. Before V4.9 is ready it MUST pull, never push.
+  window.syncOperationalV44=async function({silent=true}={}){
+    if(!window.EDUPAY_V49.ready)return refreshServerStateV49({silent,forceRender:true});
+    return syncAllServerV49({silent,refresh:true});
+  };
+  window.syncStudentsServerV47=async function({silent=false}={}){
+    const out=window.EDUPAY_V49.ready?await syncAllServerV49({silent,refresh:true}):await refreshServerStateV49({silent,forceRender:true});
+    return out?{students:db.students.length,missingGuardian:db.students.filter(s=>s.active!==false&&(!s.parent||!s.phone)).length}:null;
+  };
+  window.syncHomeroomsV46=async function({silent=false}={}){
+    if(!window.EDUPAY_V49.ready)return refreshServerStateV49({silent,forceRender:true});
+    return syncAllServerV49({silent,refresh:true});
+  };
 
   // Rebind guardian sync to guarantee latest student master is on PostgreSQL first.
   window.syncGuardianAccountsV36=async function(showToast=false){
@@ -109,6 +131,7 @@
     }catch(err){if(showToast)toast(err.message||'Sinkron akun wali gagal');return null;}
   };
 
+  // Previous modules already wrap students/classes/bills/payments. Fee type was the important missing sync.
   function wrapMutationV49(name){
     const old=window[name];if(typeof old!=='function'||old.__v49wrapped)return;
     const wrapped=function(...args){
@@ -118,13 +141,7 @@
     };
     wrapped.__v49wrapped=true;window[name]=wrapped;
   }
-  [
-    'saveStudentV33','toggleStudentV33','commitStudentImportV34',
-    'saveFeeV33','toggleFeeV33',
-    'saveBillV33','cancelBillV33','restoreBillV33','createMassBillV33',
-    'pay','reject','voidPaymentV33',
-    'saveClassV35','toggleClassV35','saveHomeroomV35','toggleHomeroomV35','commitHomeroomImportRowsV46'
-  ].forEach(wrapMutationV49);
+  ['saveFeeV33','toggleFeeV33'].forEach(wrapMutationV49);
 
   function syncIndicatorV49(){
     if(!session||!['admin','finance'].includes(session.role))return '';
