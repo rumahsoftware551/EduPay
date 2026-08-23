@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="/var/www/edupay"
 REPO_URL="https://github.com/rumahsoftware551/EduPay.git"
 DOMAIN="edupay.rumahsoftware.site"
+DEPLOY_USER="${SUDO_USER:-$(id -un)}"
 
 if ! command -v sudo >/dev/null 2>&1; then
   echo "sudo tidak tersedia. Jalankan sebagai root atau install sudo terlebih dahulu."
@@ -16,15 +17,18 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx git certbot python3
 
 echo "[2/7] Sinkronisasi source EduPay dari GitHub..."
 if [ -d "$APP_DIR/.git" ]; then
-  sudo git -C "$APP_DIR" fetch origin main
-  sudo git -C "$APP_DIR" reset --hard origin/main
+  sudo chown -R "$DEPLOY_USER":www-data "$APP_DIR"
+  git -C "$APP_DIR" fetch origin main
+  git -C "$APP_DIR" reset --hard origin/main
 else
   sudo rm -rf "$APP_DIR"
-  sudo git clone --branch main --depth 1 "$REPO_URL" "$APP_DIR"
+  sudo mkdir -p "$(dirname "$APP_DIR")"
+  sudo chown "$DEPLOY_USER":www-data "$(dirname "$APP_DIR")"
+  git clone --branch main --depth 1 "$REPO_URL" "$APP_DIR"
 fi
 
 echo "[3/7] Set permission web root..."
-sudo chown -R www-data:www-data "$APP_DIR"
+sudo chown -R "$DEPLOY_USER":www-data "$APP_DIR"
 sudo find "$APP_DIR" -type d -exec chmod 755 {} \;
 sudo find "$APP_DIR" -type f -exec chmod 644 {} \;
 
@@ -42,14 +46,20 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        expires -1;
+    }
+
     location ~* \.(?:css|js|json|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf)$ {
-        expires 7d;
+        expires 1h;
         add_header Cache-Control "public";
         try_files $uri =404;
     }
 
     location = /sw.js {
-        add_header Cache-Control "no-cache";
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        expires -1;
         try_files $uri =404;
     }
 }
@@ -70,7 +80,6 @@ sudo systemctl reload nginx
 
 echo "[7/7] Deployment HTTP selesai."
 echo
-printf 'Buka: http://%s\n' "$DOMAIN"
+printf 'Buka: https://%s\n' "$DOMAIN"
 echo
-printf 'Setelah DNS A record %s -> 157.20.233.22 aktif, jalankan SSL:\n' "$DOMAIN"
-printf '  sudo certbot --nginx -d %s\n' "$DOMAIN"
+printf 'Jika SSL belum aktif, jalankan:\n  sudo certbot --nginx -d %s\n' "$DOMAIN"
