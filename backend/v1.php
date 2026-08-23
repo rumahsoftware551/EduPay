@@ -41,7 +41,6 @@ session_set_cookie_params([
 ]);
 session_start();
 if(empty($_SESSION['csrf_v1']))$_SESSION['csrf_v1']=bin2hex(random_bytes(32));
-// V5.3 is kept as a proven handler behind the gateway. Use one token for both layers.
 $_SESSION['csrf_v53']=(string)$_SESSION['csrf_v1'];
 
 $path=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/';
@@ -66,54 +65,34 @@ if($path==='/api/v1/health'&&$method==='GET'){
     jsonV1(200,['ok'=>true,'version'=>'5.4','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'requestId'=>$requestId]);
 }
 if($path==='/api/v1/csrf'&&$method==='GET')jsonV1(200,['ok'=>true,'token'=>(string)$_SESSION['csrf_v1'],'requestId'=>$requestId]);
-
-// Every state-changing production request goes through CSRF, including login/activation/upload.
 if(!in_array($method,['GET','HEAD','OPTIONS'],true))csrfGuardV1();
 
 $script=null;$target=null;
 
-// Auth and guardian account management (base auth handler).
 if(preg_match('#^/api/v1/auth/(login|logout|me|activate)$#',$path,$m)){$script='api.php';$target='/api/auth/'.$m[1];}
+elseif($path==='/api/v1/admin/bootstrap'){$script='api.php';$target='/api/admin/bootstrap';}
 elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/(invite|reset|status)$#',$path,$m)){$script='api.php';$target='/api/admin/guardians/'.$m[1].'/'.$m[2];}
-
-// Guardian rich state/profile/repair.
 elseif($path==='/api/v1/admin/guardians'&&$method==='GET'){$script='v501.php';$target='/api/v501/admin/guardians';}
 elseif($path==='/api/v1/admin/guardians/sync'){$script='v501.php';$target='/api/v501/admin/guardians/sync';}
 elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/profile$#',$path,$m)){$script='v501.php';$target='/api/v501/admin/guardians/'.$m[1].'/profile';}
 elseif($path==='/api/v1/parent/state'){$script='v501.php';$target='/api/v501/parent/state';}
 elseif($path==='/api/v1/parent/notifications/read'){$script='v501.php';$target='/api/v501/parent/notifications/read';}
-
-// Commercial Admin CRUD V5.3.
-elseif(preg_match('#^/api/v1/admin/(state|school|students(?:/.*)?|classes(?:/.*)?|homerooms(?:/.*)?|fees(?:/.*)?|bills(?:/.*)?)$#',$path,$m)){
-    $script='v53.php';$target='/api/v53/admin/'.$m[1];
-}
-
-// Staff operational snapshot/cache bridge.
+elseif(preg_match('#^/api/v1/admin/(state|school|students(?:/.*)?|classes(?:/.*)?|homerooms(?:/.*)?|fees(?:/.*)?|bills(?:/.*)?)$#',$path,$m)){$script='v53.php';$target='/api/v53/admin/'.$m[1];}
 elseif($path==='/api/v1/staff/state'){$script='v49.php';$target='/api/v49/state';}
 elseif($path==='/api/v1/staff/sync-all'){$script='v49.php';$target='/api/v49/sync-all';}
-
-// Atomic finance transactions and parent payment ledger.
 elseif(preg_match('#^/api/v1/finance/(bills/\d+/(?:pay|approve|reject)|payments/\d+/void)$#',$path,$m)){$script='v50.php';$target='/api/v50/finance/'.$m[1];}
 elseif($path==='/api/v1/parent/payments'){$script='v50.php';$target='/api/v50/parent/payments';}
-
-// Shared Admin + Finance proof verification.
 elseif($path==='/api/v1/verification'){$script='v502.php';$target='/api/v502/verification';}
 elseif(preg_match('#^/api/v1/verification/bills/(\d+)/(approve|reject)$#',$path,$m)){$script='v502.php';$target='/api/v502/bills/'.$m[1].'/'.$m[2];}
-
-// Private transfer proof storage/view.
 elseif(preg_match('#^/api/v1/parent/bills/(\d+)/proof$#',$path,$m)){$script='v51.php';$target='/api/v51/parent/bills/'.$m[1].'/proof';}
 elseif(preg_match('#^/api/v1/proofs/(\d+)$#',$path,$m)){$script='v51.php';$target='/api/v51/proofs/'.$m[1];}
-
-// Staff notifications.
 elseif($path==='/api/v1/staff/notifications'){$script='v52.php';$target='/api/v52/notifications';}
 elseif($path==='/api/v1/staff/notifications/read'){$script='v52.php';$target='/api/v52/notifications/read';}
 
 if(!$script||!$target){logV1('INFO','route_not_found');jsonV1(404,['ok'=>false,'message'=>'Endpoint API v1 tidak ditemukan','requestId'=>$requestId]);}
-
 $full=__DIR__.'/'.$script;
 if(!is_file($full)){logV1('ERROR','handler_missing',['handler'=>$script]);jsonV1(500,['ok'=>false,'message'=>'Handler API belum tersedia','requestId'=>$requestId]);}
 
-// Persist CSRF/session changes, then let the proven handler reopen the same secure session.
 session_write_close();
 $_SERVER['REQUEST_URI']=$target.($query!==''?'?'.$query:'');
 logV1('INFO','dispatch',['handler'=>$script,'target'=>$target]);
