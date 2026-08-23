@@ -1,0 +1,9 @@
+{
+  "name":"EduPay - School Finance",
+  "short_name":"EduPay",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#f6f8fc",
+  "theme_color":"#2563eb",
+  "description":"Aplikasi pembayaran siswa sederhana untuk Admin, Finance, dan Orang Tua/Wali."
+}
