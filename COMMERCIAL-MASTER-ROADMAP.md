@@ -12,7 +12,7 @@ Target akhir: **EduPay V6.0 Commercial Master** — master instalasi pembayaran 
 7. Source tidak diedit per sekolah; branding dan profil sekolah diatur dari panel.
 
 ## V5.3 — Commercial Core
-Status: **IMPLEMENTED / perlu deployment & UAT**
+Status: **IMPLEMENTED / UAT berkelanjutan**
 - Server-first siswa, kelas, wali kelas, jenis pembayaran, tagihan.
 - Import siswa/wali kelas server-first.
 - CSRF khusus Commercial Admin API.
@@ -24,33 +24,42 @@ Exit criteria:
 - Tagihan massal dicegah duplikat dari sisi database/API.
 
 ## V5.4 — Security & Core Consolidation
-- Satu API router `/api/v1/*`.
-- CSRF untuk seluruh POST/PUT/PATCH/DELETE.
-- Hapus demo credential dan auth fallback lokal.
-- Session bootstrap selalu dari server `/auth/me`.
-- CSP, HSTS, frame-ancestors, permissions policy.
-- Central error handler + server log.
-- Request ID untuk audit/troubleshooting.
-- Reorganisasi frontend ke satu runtime core; file versi lama menjadi compatibility-only lalu dihapus bertahap.
+Status: **IMPLEMENTED / UAT berkelanjutan**
+- Satu public API router `/api/v1/*`.
+- CSRF untuk mutation production.
+- Demo credential dan `app.js` demo dihapus dari runtime production.
+- Session bootstrap dari server `/auth/me`.
+- CSP, HSTS, anti-clickjacking, referrer/permissions policy.
+- Central error log + request ID.
+- Direct legacy API route ditutup; handler lama hanya compatibility internal.
+- Aktivasi Akun Wali production dipulihkan pada hotfix V5.4.1.
 
 Exit criteria:
-- Tidak ada mutation production yang tidak memakai CSRF.
+- Tidak ada mutation production yang tidak melewati CSRF gateway.
 - Tidak ada password demo pada runtime UI.
-- Authorization tidak pernah ditentukan oleh LocalStorage.
+- Authorization tidak ditentukan oleh LocalStorage.
 
 ## V5.5 — Reports & Scale
-- Server-side pagination/search/filter untuk siswa, tagihan, payment, guardian.
-- Dashboard aggregate SQL.
-- Laporan penerimaan per tanggal/metode/kelas.
-- Laporan tunggakan per kelas/siswa.
-- Export CSV/XLSX server-side.
-- Query index review untuk 10.000+ siswa.
+Status: **IMPLEMENTED / perlu deployment & UAT VPS**
+- Server-side pagination/search/filter untuk siswa, tagihan, pembayaran, dan akun wali.
+- Dashboard memakai aggregate SQL, bukan perhitungan seluruh dataset di browser.
+- Laporan penerimaan per periode/metode/kelas.
+- Laporan tunggakan per kelas/siswa dan opsi overdue.
+- Export CSV dan XLSX dibuat server-side.
+- Index PostgreSQL untuk pola query 10.000+ siswa/tagihan/payment.
+- Admin master-state diperkecil: hanya kelas, wali kelas, jenis pembayaran, dan profil sekolah.
+- Legacy V4.9 snapshot dialihkan ke lightweight compatibility bridge; browser tidak lagi mengirim/pengambil full operational snapshot.
+- Filter client V4.5 dinonaktifkan pada tabel yang sudah server-paginated agar tidak terjadi pagination ganda.
+- Cache besar legacy dipangkas dan action data sensitif memakai ID-based lookup.
 
 Exit criteria:
 - Dataset besar tidak dikirim penuh ke browser.
 - Filter/pagination konsisten antar browser.
+- Dashboard tetap cepat pada jumlah data besar.
+- Export CSV/XLSX berasal dari query server dengan filter yang sama seperti laporan.
 
 ## V5.6 — Backup, Branding & Documents
+Status: **NEXT**
 - Scheduled PostgreSQL backup.
 - Scheduled backup private proof storage.
 - Retention policy.
