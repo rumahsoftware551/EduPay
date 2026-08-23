@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="/var/www/edupay"
+CONFIG_FILE="$APP_DIR/backend/config.php"
+MIGRATION="$APP_DIR/backend/migrations/0056_commercial_master.sql"
+PRE_BACKUP="/var/backups/edupay"
+
+[ -f "$CONFIG_FILE" ] || { echo 'ERROR: backend/config.php tidak ditemukan' >&2; exit 1; }
+for F in backend/v1.php backend/v56.php backend/v56finance.php backend/v552.php backend/v55.php commercial-final-v56.js commercial-final-v56.css deploy/backup-edupay.sh deploy/verify-restore.sh deploy/systemd/edupay-backup.service deploy/systemd/edupay-backup.timer index.html sw.js; do
+  [ -f "$APP_DIR/$F" ] || { echo "ERROR: $F tidak ditemukan" >&2; exit 1; }
+done
+[ -f "$MIGRATION" ] || { echo 'ERROR: migration V5.6 tidak ditemukan' >&2; exit 1; }
+
+DB_USER="$(php -r '$c=require $argv[1]; echo $c["db"]["user"];' "$CONFIG_FILE")"
+DB_PASSWORD="$(php -r '$c=require $argv[1]; echo $c["db"]["password"];' "$CONFIG_FILE")"
+DB_DSN="$(php -r '$c=require $argv[1]; echo $c["db"]["dsn"];' "$CONFIG_FILE")"
+DB_NAME="$(printf '%s' "$DB_DSN" | sed -n 's/.*dbname=\([^;]*\).*/\1/p')"
+DB_HOST="$(printf '%s' "$DB_DSN" | sed -n 's/.*host=\([^;]*\).*/\1/p')"; DB_HOST="${DB_HOST:-127.0.0.1}"
+SCHOOL_CODE="$(php -r '$c=require $argv[1]; echo $c["app"]["school_code"]??"default-school";' "$CONFIG_FILE")"
+PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+
+printf '[1/9] Pre-upgrade PostgreSQL backup...\n'
+sudo mkdir -p "$PRE_BACKUP"
+PRE_FILE="$PRE_BACKUP/edupay-pre-v56-$(date +%Y%m%d-%H%M%S).sql.gz"
+PGPASSWORD="$DB_PASSWORD" pg_dump -h "$DB_HOST" -U "$DB_USER" --no-owner --no-privileges "$DB_NAME" | gzip -9 | sudo tee "$PRE_FILE" >/dev/null
+sudo chmod 600 "$PRE_FILE"
+echo "Backup: $PRE_FILE"
+
+printf '[2/9] Apply V5.6 Commercial Master migration...\n'
+PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$MIGRATION"
+PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -v school_code="$SCHOOL_CODE" -c "SELECT id,code,name,receipt_prefix,backup_retention_days FROM schools WHERE code=:'school_code';"
+
+printf '[3/9] Prepare private storage and maintenance folders...\n'
+sudo mkdir -p /var/lib/edupay/proofs /var/lib/edupay/branding /var/lib/edupay/maintenance /var/backups/edupay/daily /var/log/edupay
+sudo chown -R www-data:www-data /var/lib/edupay/proofs /var/lib/edupay/branding
+sudo chmod 750 /var/lib/edupay/proofs /var/lib/edupay/branding /var/lib/edupay/maintenance
+sudo chmod +x "$APP_DIR/deploy/backup-edupay.sh" "$APP_DIR/deploy/verify-restore.sh"
+
+printf '[4/9] Install daily backup timer...\n'
+sudo cp "$APP_DIR/deploy/systemd/edupay-backup.service" /etc/systemd/system/edupay-backup.service
+sudo cp "$APP_DIR/deploy/systemd/edupay-backup.timer" /etc/systemd/system/edupay-backup.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now edupay-backup.timer
+sudo systemctl list-timers edupay-backup.timer --no-pager
+
+printf '[5/9] Run first full backup...\n'
+sudo "$APP_DIR/deploy/backup-edupay.sh"
+
+printf '[6/9] Restore rehearsal in isolated temporary database...\n'
+sudo "$APP_DIR/deploy/verify-restore.sh"
+
+printf '[7/9] Syntax/runtime preflight...\n'
+php -l "$APP_DIR/backend/v1.php" >/dev/null
+php -l "$APP_DIR/backend/v56.php" >/dev/null
+php -l "$APP_DIR/backend/v56finance.php" >/dev/null
+php -l "$APP_DIR/backend/v552.php" >/dev/null
+php -l "$APP_DIR/backend/v55.php" >/dev/null
+grep -q 'commercial-final-v56.js?v=5.6' "$APP_DIR/index.html" || { echo 'ERROR: index belum V5.6' >&2; exit 1; }
+grep -q 'edupay-commercial-master-v5.6' "$APP_DIR/sw.js" || { echo 'ERROR: service worker belum V5.6' >&2; exit 1; }
+grep -q "version'=>'5.6'\|'version'=>'5.6'\|\"version\":\"5.6\"" "$APP_DIR/backend/v1.php" || true
+if command -v node >/dev/null 2>&1; then node --check "$APP_DIR/commercial-final-v56.js"; else echo 'INFO: node tidak tersedia; JS syntax check dilewati.'; fi
+
+printf '[8/9] Restart application services...\n'
+sudo systemctl restart "php${PHP_VER}-fpm"
+sudo nginx -t
+sudo systemctl reload nginx
+
+printf '[9/9] Final health checks...\n'
+sleep 2
+HEALTH="$(curl -fsS https://edupay.rumahsoftware.site/api/v1/health)"; echo "$HEALTH"
+printf '%s' "$HEALTH" | grep -q '"version":"5.6"' || { echo 'ERROR: API belum V5.6' >&2; exit 1; }
+printf '%s' "$HEALTH" | grep -q '"commercial_master":true' || { echo 'ERROR: commercial_master belum aktif' >&2; exit 1; }
+BRAND="$(curl -fsS https://edupay.rumahsoftware.site/api/v1/branding)"; echo "$BRAND"
+printf '%s' "$BRAND" | grep -q '"ok":true' || { echo 'ERROR: branding endpoint gagal' >&2; exit 1; }
+LEGACY="$(curl -s -o /dev/null -w '%{http_code}' https://edupay.rumahsoftware.site/api/v56/health || true)"
+printf 'Legacy direct /api/v56/health HTTP: %s (expected 404)\n' "$LEGACY"
+
+printf '\nEduPay V5.6 Commercial Master deployment PASS.\n'
+printf 'Pre-upgrade backup: %s\n' "$PRE_FILE"
+printf 'Daily backup timer: aktif\nRestore rehearsal: PASS\n'
+printf 'Buka: https://edupay.rumahsoftware.site/?v=56\n'
