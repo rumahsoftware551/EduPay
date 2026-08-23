@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('admin','finance','parent')),
   status VARCHAR(30) NOT NULL DEFAULT 'active' CHECK (status IN ('active','not_invited','invited','disabled')),
+  salutation VARCHAR(10) NULL CHECK (salutation IS NULL OR salutation IN ('Bapak','Ibu')),
+  nickname VARCHAR(80) NULL,
   failed_attempts INTEGER NOT NULL DEFAULT 0,
   locked_until TIMESTAMPTZ NULL,
   activated_at TIMESTAMPTZ NULL,
@@ -106,6 +108,7 @@ CREATE TABLE IF NOT EXISTS bills (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (school_id, external_id)
 );
+CREATE INDEX IF NOT EXISTS idx_bills_student_updated ON bills(student_id,updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS payments (
   id BIGSERIAL PRIMARY KEY,
@@ -135,7 +138,23 @@ CREATE TABLE IF NOT EXISTS activation_tokens (
   created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_activation_user_active ON activation_tokens(user_id, used_at, expires_at);
+CREATE INDEX IF NOT EXISTS idx_activation_user_active ON activation_tokens(user_id,used_at,expires_at);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGSERIAL PRIMARY KEY,
+  school_id BIGINT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  student_id BIGINT NULL REFERENCES students(id) ON DELETE CASCADE,
+  type VARCHAR(40) NOT NULL DEFAULT 'info',
+  title VARCHAR(160) NOT NULL,
+  message TEXT NOT NULL,
+  entity_type VARCHAR(60) NULL,
+  entity_id VARCHAR(100) NULL,
+  read_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id,read_at) WHERE read_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGSERIAL PRIMARY KEY,
