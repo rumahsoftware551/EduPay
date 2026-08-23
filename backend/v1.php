@@ -78,7 +78,6 @@ elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/profile$#',$path,$m)){$script
 elseif($path==='/api/v1/parent/state'){$script='v501.php';$target='/api/v501/parent/state';}
 elseif($path==='/api/v1/parent/notifications/read'){$script='v501.php';$target='/api/v501/parent/notifications/read';}
 
-// V5.5 server-side pagination/reporting. Keep these before broad admin V5.3 routes.
 elseif($path==='/api/v1/scale/meta'){$script='v55.php';$target='/api/v55/meta';}
 elseif($path==='/api/v1/scale/admin/master'){$script='v55.php';$target='/api/v55/admin/master';}
 elseif($path==='/api/v1/scale/dashboard'){$script='v55.php';$target='/api/v55/dashboard';}
@@ -90,6 +89,8 @@ elseif($path==='/api/v1/scale/payments'){$script='v55.php';$target='/api/v55/pay
 elseif($path==='/api/v1/scale/reports/summary'){$script='v55.php';$target='/api/v55/reports/summary';}
 elseif($path==='/api/v1/scale/reports/arrears'){$script='v55.php';$target='/api/v55/reports/arrears';}
 elseif(preg_match('#^/api/v1/scale/export/(payments|arrears)$#',$path,$m)){$script='v55.php';$target='/api/v55/export/'.$m[1];}
+elseif($path==='/api/v1/scale/compat/state'){$script='v55compat.php';$target='/api/v55compat/state';}
+elseif($path==='/api/v1/scale/compat/sync-all'){$script='v55compat.php';$target='/api/v55compat/sync-all';}
 
 elseif(preg_match('#^/api/v1/admin/(state|school|students(?:/.*)?|classes(?:/.*)?|homerooms(?:/.*)?|fees(?:/.*)?|bills(?:/.*)?)$#',$path,$m)){$script='v53.php';$target='/api/v53/admin/'.$m[1];}
 elseif($path==='/api/v1/staff/state'){$script='v49.php';$target='/api/v49/state';}
