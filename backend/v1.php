@@ -61,8 +61,8 @@ function csrfGuardV1():void{
 
 if($path==='/api/v1/health'&&$method==='GET'){
     try{$pdo=new PDO($config['db']['dsn'],$config['db']['user'],$config['db']['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);$pdo->query('SELECT 1');}
-    catch(Throwable $e){logV1('ERROR','health_db_failed',['message'=>$e->getMessage()]);jsonV1(503,['ok'=>false,'version'=>'5.5','database'=>false,'requestId'=>$requestId]);}
-    jsonV1(200,['ok'=>true,'version'=>'5.5','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'reports_scale'=>true,'requestId'=>$requestId]);
+    catch(Throwable $e){logV1('ERROR','health_db_failed',['message'=>$e->getMessage()]);jsonV1(503,['ok'=>false,'version'=>'5.5.1','database'=>false,'requestId'=>$requestId]);}
+    jsonV1(200,['ok'=>true,'version'=>'5.5.1','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'reports_scale'=>true,'portal_state'=>true,'requestId'=>$requestId]);
 }
 if($path==='/api/v1/csrf'&&$method==='GET')jsonV1(200,['ok'=>true,'token'=>(string)$_SESSION['csrf_v1'],'requestId'=>$requestId]);
 if(!in_array($method,['GET','HEAD','OPTIONS'],true))csrfGuardV1();
@@ -77,6 +77,8 @@ elseif($path==='/api/v1/admin/guardians/sync'){$script='v501.php';$target='/api/
 elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/profile$#',$path,$m)){$script='v501.php';$target='/api/v501/admin/guardians/'.$m[1].'/profile';}
 elseif($path==='/api/v1/parent/state'){$script='v501.php';$target='/api/v501/parent/state';}
 elseif($path==='/api/v1/parent/notifications/read'){$script='v501.php';$target='/api/v501/parent/notifications/read';}
+
+elseif($path==='/api/v1/portal/state'){$script='v551.php';$target='/api/v551/portal/state';}
 
 elseif($path==='/api/v1/scale/meta'){$script='v55.php';$target='/api/v55/meta';}
 elseif($path==='/api/v1/scale/admin/master'){$script='v55.php';$target='/api/v55/admin/master';}
