@@ -7,7 +7,7 @@ BACKUP_DIR="/var/backups/edupay"
 MIGRATION="$APP_DIR/backend/migrations/0055_reports_scale.sql"
 
 [ -f "$CONFIG_FILE" ] || { echo 'ERROR: backend/config.php tidak ditemukan' >&2; exit 1; }
-for F in backend/v1.php backend/v55.php backend/v55compat.php reports-scale-v55.js reports-scale-v55.css api-gateway-shim-v54.js; do
+for F in backend/v1.php backend/v55.php backend/v55compat.php reports-scale-v55.js scale-safety-v55.js reports-scale-v55.css api-gateway-shim-v54.js; do
   [ -f "$APP_DIR/$F" ] || { echo "ERROR: $F tidak ditemukan" >&2; exit 1; }
 done
 [ -f "$MIGRATION" ] || { echo 'ERROR: migration V5.5 tidak ditemukan' >&2; exit 1; }
@@ -41,11 +41,13 @@ php -l "$APP_DIR/backend/v55compat.php" >/dev/null
 php -l "$APP_DIR/backend/v1.php" >/dev/null
 if command -v node >/dev/null 2>&1; then
   node --check "$APP_DIR/reports-scale-v55.js"
+  node --check "$APP_DIR/scale-safety-v55.js"
   node --check "$APP_DIR/api-gateway-shim-v54.js"
 else
   echo 'INFO: node tidak tersedia; JS syntax check dilewati.'
 fi
 grep -q 'reports-scale-v55.js?v=5.5' "$APP_DIR/index.html" || { echo 'ERROR: index.html belum memuat V5.5' >&2; exit 1; }
+grep -q 'scale-safety-v55.js?v=5.5' "$APP_DIR/index.html" || { echo 'ERROR: safety layer V5.5 belum aktif' >&2; exit 1; }
 grep -q 'reports-scale-v55.css?v=5.5' "$APP_DIR/index.html" || { echo 'ERROR: CSS V5.5 belum aktif' >&2; exit 1; }
 grep -q "edupay-professional-v5.5" "$APP_DIR/sw.js" || { echo 'ERROR: service worker belum V5.5' >&2; exit 1; }
 grep -q '/api/v1/scale/compat/state' "$APP_DIR/api-gateway-shim-v54.js" || { echo 'ERROR: legacy snapshot belum diarahkan ke compatibility bridge' >&2; exit 1; }
