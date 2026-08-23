@@ -30,7 +30,7 @@ elseif($path==='/api/v1/branding'){$script='v56.php';$target='/api/v56/branding'
 elseif($path==='/api/v1/branding/logo'){$script='v56.php';$target='/api/v56/branding/logo';}
 elseif($path==='/api/v1/commercial/health'){$script='v56.php';$target='/api/v56/health';}
 elseif($path==='/api/v1/commercial/admin/maintenance'){$script='v56.php';$target='/api/v56/admin/maintenance';}
-elseif($path==='/api/v1/commercial/admin/readiness'){$script='v56.php';$target='/api/v56/admin/readiness';}
+elseif($path==='/api/v1/commercial/admin/readiness'){$script='v56readiness.php';$target='/api/v56readiness';}
 elseif($path==='/api/v1/commercial/admin/settings'){$script='v56.php';$target='/api/v56/admin/settings';}
 elseif($path==='/api/v1/commercial/admin/logo'){$script='v56.php';$target='/api/v56/admin/logo';}
 elseif(preg_match('#^/api/v1/commercial/receipts/(\d+)$#',$path,$m)){$script='v56.php';$target='/api/v56/receipts/'.$m[1];}
