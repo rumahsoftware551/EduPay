@@ -1,0 +1,8 @@
+.staff-bell-v52{position:relative}
+.staff-count-v52{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;background:#ef4444;color:#fff;border:2px solid #fff;line-height:1}
+.staff-notify-head-v52{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 0 14px;border-bottom:1px solid #e5e7eb;margin-bottom:8px}
+.staff-notify-head-v52>div{display:flex;flex-direction:column;gap:3px}
+.staff-notify-head-v52 span{font-size:12px;color:#64748b}
+.staff-notify-list-v52{max-height:430px;overflow:auto}
+.staff-notify-list-v52 .notification-item-v44{width:100%;text-align:left}
+@media(max-width:640px){.staff-notify-head-v52{align-items:flex-start;flex-direction:column}.staff-notify-list-v52{max-height:55vh}.staff-count-v52{top:-4px;right:-4px}}
