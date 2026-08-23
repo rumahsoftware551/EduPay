@@ -19,7 +19,13 @@ SCHOOL_CODE="$(php -r '$c=require $argv[1]; echo $c["app"]["school_code"]??"defa
 sudo mkdir -p "$BACKUP_ROOT" "$PROOF_DIR" "$BRAND_DIR" "$MAINT_DIR"
 sudo chown root:www-data "$MAINT_DIR"
 sudo chmod 750 "$MAINT_DIR"
-RETENTION="$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -At -v school_code="$SCHOOL_CODE" -c "SELECT COALESCE(backup_retention_days,30) FROM schools WHERE code=:'school_code' LIMIT 1;" 2>/dev/null || true)"
+RETENTION="$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -At -v ON_ERROR_STOP=1 -v school_code="$SCHOOL_CODE" <<'SQL'
+SELECT COALESCE(backup_retention_days,30)
+FROM schools
+WHERE code=:'school_code'
+LIMIT 1;
+SQL
+)"
 [[ "$RETENTION" =~ ^[0-9]+$ ]] || RETENTION=30
 if [ "$RETENTION" -lt 7 ] || [ "$RETENTION" -gt 365 ]; then RETENTION=30; fi
 
