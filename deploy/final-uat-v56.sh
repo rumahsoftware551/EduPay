@@ -48,8 +48,8 @@ SQL
     done
   fi
   if [ -n "$STUDENT1$STUDENT2$STUDENT3" ]; then
-    sql -v tag="$TAG" <<'SQL' >/dev/null 2>&1 || true
-DELETE FROM audit_logs WHERE metadata::text LIKE '%' || :'tag' || '%' OR entity_id IN (SELECT id::text FROM bills WHERE external_id LIKE 'uat:' || :'tag' || ':%');
+    sql -v tag="$TAG" -v adminu="$ADMIN_USER" -v finu="$FIN_USER" -v phone="$PHONE" -v actphone="$ACT_PHONE" -v aid="${ADMIN_ID:-0}" -v fid="${FIN_ID:-0}" -v pid="${PARENT_ID:-0}" -v apid="${ACT_PARENT_ID:-0}" <<'SQL' >/dev/null 2>&1 || true
+DELETE FROM audit_logs WHERE user_id IN (:aid,:fid,:pid,:apid) OR metadata::text LIKE '%' || :'tag' || '%' OR entity_id IN (SELECT id::text FROM bills WHERE external_id LIKE 'uat:' || :'tag' || ':%');
 DELETE FROM payments WHERE bill_id IN (SELECT id FROM bills WHERE external_id LIKE 'uat:' || :'tag' || ':%');
 DELETE FROM bills WHERE external_id LIKE 'uat:' || :'tag' || ':%';
 DELETE FROM students WHERE external_id LIKE 'uat:' || :'tag' || ':%';
@@ -64,7 +64,6 @@ trap cleanup EXIT
 printf '\n=== EduPay V5.6 FINAL UAT ===\nInstance: %s\nTag: %s\n\n' "$BASE_URL" "$TAG"
 [ -f /var/log/edupay/app.log ] && START_LOG_LINES="$(wc -l </var/log/edupay/app.log)" || START_LOG_LINES=0
 
-# A. Static/runtime preflight
 printf '[A] Deployment & runtime\n'
 for f in backend/v1.php backend/v56.php backend/v56readiness.php backend/v56finance.php backend/v56scale.php backend/v552.php backend/v51.php backend/v502.php uat-fixes-v56.js commercial-final-v56.js; do
   if [ -f "$APP_DIR/$f" ]; then ok "File $f tersedia"; else fail "File $f tidak ditemukan"; fi
@@ -79,7 +78,6 @@ if [ "$authless_code" = 200 ] && [ "$(cat "$TMP/health.json"|json_get version)" 
 legacy="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE_URL/api/v56/health" || true)"; [ "$legacy" = 404 ] && ok 'Direct legacy API tertutup (404)' || fail "Legacy API masih terbuka: HTTP $legacy"
 brand_code="$(curl -sS -o "$TMP/brand.json" -w '%{http_code}' "$BASE_URL/api/v1/branding" || true)"; [ "$brand_code" = 200 ] && [ "$(cat "$TMP/brand.json"|json_get ok)" = true ] && ok 'Public branding endpoint' || fail 'Public branding endpoint'
 
-# B. Backup/restore
 printf '\n[B] Backup & restore\n'
 if systemctl is-active --quiet edupay-backup.timer; then ok 'edupay-backup.timer aktif'; else fail 'edupay-backup.timer tidak aktif'; fi
 if [ -f /var/lib/edupay/maintenance/backup-status.json ] && [ "$(cat /var/lib/edupay/maintenance/backup-status.json|json_get ok)" = true ]; then ok 'backup-status.json PASS'; else fail 'backup-status.json belum PASS'; fi
@@ -87,7 +85,6 @@ if [ -f /var/lib/edupay/maintenance/restore-status.json ] && [ "$(cat /var/lib/e
 latest_backup="$(find /var/backups/edupay/daily -mindepth 1 -maxdepth 1 -type d 2>/dev/null|sort|tail -n1)"
 if [ -n "$latest_backup" ] && [ -f "$latest_backup/manifest.sha256" ] && (cd "$latest_backup" && sha256sum -c manifest.sha256 >/dev/null 2>&1); then ok 'Checksum backup terakhir valid'; else fail 'Checksum backup terakhir tidak valid/tidak ditemukan'; fi
 
-# C. Create isolated fixtures in active school
 printf '\n[C] Create temporary UAT fixtures\n'
 SCHOOL_ID="$(sql -v school_code="$SCHOOL_CODE" <<'SQL'
 SELECT id FROM schools WHERE code=:'school_code' LIMIT 1;
@@ -141,7 +138,6 @@ SQL
 BILL_APPROVE="$(create_bill APPROVE "$STUDENT1" 11001)"; BILL_REJECT="$(create_bill REJECT "$STUDENT1" 11002)"; BILL_CASH="$(create_bill CASH "$STUDENT2" 11003)"; BILL_QRIS="$(create_bill QRIS "$STUDENT2" 11004)"; BILL_TRANSFER="$(create_bill TRANSFER "$STUDENT2" 11005)"; BILL_OTHER="$(create_bill OTHER "$STUDENT3" 11006)"
 ok 'Fixture Admin/Finance/Wali, 3 siswa, 6 tagihan dibuat'
 
-# HTTP helpers
 csrf(){ local jar="$1" out; out="$(curl -sS -c "$jar" -b "$jar" "$BASE_URL/api/v1/csrf")"; printf '%s' "$out"|json_get token; }
 login(){ local jar="$1" user="$2" pass="$3" token code; token="$(csrf "$jar")"; code="$(curl -sS -c "$jar" -b "$jar" -o "$TMP/login.json" -w '%{http_code}' -H 'Content-Type: application/json' -H "X-CSRF-Token: $token" --data "{\"username\":\"$user\",\"password\":\"$pass\"}" "$BASE_URL/api/v1/auth/login")"; [ "$code" = 200 ]; }
 post_json(){ local jar="$1" path="$2" payload="$3" token; token="$(csrf "$jar")"; HTTP_CODE="$(curl -sS -c "$jar" -b "$jar" -o "$TMP/body.json" -w '%{http_code}' -H 'Content-Type: application/json' -H "X-CSRF-Token: $token" --data "$payload" "$BASE_URL$path")"; HTTP_BODY="$(cat "$TMP/body.json")"; }
@@ -152,7 +148,6 @@ printf '\n[D] Authentication, CSRF, dashboard, multi-child\n'
 login "$ADMIN_JAR" "$ADMIN_USER" "$PASSWORD" && ok 'Login Admin server-session' || fail 'Login Admin'
 login "$FIN_JAR" "$FIN_USER" "$PASSWORD" && ok 'Login Finance server-session' || fail 'Login Finance'
 login "$PAR_JAR" "$PHONE" "$PASSWORD" && ok 'Login Parent server-session' || fail 'Login Parent'
-# CSRF negative check on authenticated admin
 csrf_negative="$(curl -sS -b "$ADMIN_JAR" -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' --data '{}' "$BASE_URL/api/v1/admin/guardians/sync")"; [ "$csrf_negative" = 419 ] && ok 'Mutation tanpa CSRF ditolak 419' || fail "CSRF negative test HTTP $csrf_negative"
 get_auth "$ADMIN_JAR" '/api/v1/portal/state'; [ "$HTTP_CODE" = 200 ] && [ "$(printf '%s' "$HTTP_BODY"|json_get role)" = admin ] && ok 'Dashboard Admin dari PostgreSQL' || fail "Dashboard Admin: $HTTP_CODE $HTTP_BODY"
 get_auth "$FIN_JAR" '/api/v1/portal/state'; [ "$HTTP_CODE" = 200 ] && [ "$(printf '%s' "$HTTP_BODY"|json_get role)" = finance ] && ok 'Dashboard Finance dari PostgreSQL' || fail "Dashboard Finance: $HTTP_CODE $HTTP_BODY"
