@@ -35,10 +35,7 @@ set_error_handler(function(int $severity,string $message,string $file,int $line)
 ini_set('session.use_strict_mode','1');
 ini_set('session.use_only_cookies','1');
 session_name($config['app']['cookie_name']??'edupay_session');
-session_set_cookie_params([
-    'lifetime'=>(int)($config['app']['session_ttl']??43200),
-    'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax'
-]);
+session_set_cookie_params(['lifetime'=>(int)($config['app']['session_ttl']??43200),'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax']);
 session_start();
 if(empty($_SESSION['csrf_v1']))$_SESSION['csrf_v1']=bin2hex(random_bytes(32));
 $_SESSION['csrf_v53']=(string)$_SESSION['csrf_v1'];
@@ -46,29 +43,18 @@ $_SESSION['csrf_v53']=(string)$_SESSION['csrf_v1'];
 $path=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/';
 $query=parse_url($_SERVER['REQUEST_URI']??'',PHP_URL_QUERY)?:'';
 $method=$_SERVER['REQUEST_METHOD']??'GET';
-
-function jsonV1(int $status,array $payload):never{
-    http_response_code($status);header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);exit;
-}
-function csrfGuardV1():void{
-    $got=(string)($_SERVER['HTTP_X_CSRF_TOKEN']??'');$expected=(string)($_SESSION['csrf_v1']??'');
-    if($got===''||$expected===''||!hash_equals($expected,$got)){
-        logV1('SECURITY','csrf_rejected');
-        jsonV1(419,['ok'=>false,'message'=>'Sesi keamanan kedaluwarsa. Muat ulang halaman lalu coba lagi.','requestId'=>$GLOBALS['requestId']]);
-    }
-}
+function jsonV1(int $status,array $payload):never{http_response_code($status);header('Content-Type: application/json; charset=utf-8');echo json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);exit;}
+function csrfGuardV1():void{$got=(string)($_SERVER['HTTP_X_CSRF_TOKEN']??'');$expected=(string)($_SESSION['csrf_v1']??'');if($got===''||$expected===''||!hash_equals($expected,$got)){logV1('SECURITY','csrf_rejected');jsonV1(419,['ok'=>false,'message'=>'Sesi keamanan kedaluwarsa. Muat ulang halaman lalu coba lagi.','requestId'=>$GLOBALS['requestId']]);}}
 
 if($path==='/api/v1/health'&&$method==='GET'){
     try{$pdo=new PDO($config['db']['dsn'],$config['db']['user'],$config['db']['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);$pdo->query('SELECT 1');}
-    catch(Throwable $e){logV1('ERROR','health_db_failed',['message'=>$e->getMessage()]);jsonV1(503,['ok'=>false,'version'=>'5.5.1','database'=>false,'requestId'=>$requestId]);}
-    jsonV1(200,['ok'=>true,'version'=>'5.5.1','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'reports_scale'=>true,'portal_state'=>true,'requestId'=>$requestId]);
+    catch(Throwable $e){logV1('ERROR','health_db_failed',['message'=>$e->getMessage()]);jsonV1(503,['ok'=>false,'version'=>'5.6','database'=>false,'requestId'=>$requestId]);}
+    jsonV1(200,['ok'=>true,'version'=>'5.6','api'=>'v1','security_hardening'=>true,'csrf'=>true,'server_session'=>true,'database'=>true,'reports_scale'=>true,'portal_state'=>true,'commercial_master'=>true,'backup_restore'=>true,'branding'=>true,'official_receipts'=>true,'requestId'=>$requestId]);
 }
 if($path==='/api/v1/csrf'&&$method==='GET')jsonV1(200,['ok'=>true,'token'=>(string)$_SESSION['csrf_v1'],'requestId'=>$requestId]);
 if(!in_array($method,['GET','HEAD','OPTIONS'],true))csrfGuardV1();
 
 $script=null;$target=null;
-
 if(preg_match('#^/api/v1/auth/(login|logout|me|activate)$#',$path,$m)){$script='api.php';$target='/api/auth/'.$m[1];}
 elseif($path==='/api/v1/admin/bootstrap'){$script='api.php';$target='/api/admin/bootstrap';}
 elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/(invite|reset|status)$#',$path,$m)){$script='api.php';$target='/api/admin/guardians/'.$m[1].'/'.$m[2];}
@@ -77,8 +63,16 @@ elseif($path==='/api/v1/admin/guardians/sync'){$script='v501.php';$target='/api/
 elseif(preg_match('#^/api/v1/admin/guardians/(\d+)/profile$#',$path,$m)){$script='v501.php';$target='/api/v501/admin/guardians/'.$m[1].'/profile';}
 elseif($path==='/api/v1/parent/state'){$script='v501.php';$target='/api/v501/parent/state';}
 elseif($path==='/api/v1/parent/notifications/read'){$script='v501.php';$target='/api/v501/parent/notifications/read';}
+elseif($path==='/api/v1/portal/state'){$script='v552.php';$target='/api/v552/portal/state';}
 
-elseif($path==='/api/v1/portal/state'){$script='v551.php';$target='/api/v551/portal/state';}
+elseif($path==='/api/v1/branding'){$script='v56.php';$target='/api/v56/branding';}
+elseif($path==='/api/v1/branding/logo'){$script='v56.php';$target='/api/v56/branding/logo';}
+elseif($path==='/api/v1/commercial/health'){$script='v56.php';$target='/api/v56/health';}
+elseif($path==='/api/v1/commercial/admin/maintenance'){$script='v56.php';$target='/api/v56/admin/maintenance';}
+elseif($path==='/api/v1/commercial/admin/readiness'){$script='v56.php';$target='/api/v56/admin/readiness';}
+elseif($path==='/api/v1/commercial/admin/settings'){$script='v56.php';$target='/api/v56/admin/settings';}
+elseif($path==='/api/v1/commercial/admin/logo'){$script='v56.php';$target='/api/v56/admin/logo';}
+elseif(preg_match('#^/api/v1/commercial/receipts/(\d+)$#',$path,$m)){$script='v56.php';$target='/api/v56/receipts/'.$m[1];}
 
 elseif($path==='/api/v1/scale/meta'){$script='v55.php';$target='/api/v55/meta';}
 elseif($path==='/api/v1/scale/admin/master'){$script='v55.php';$target='/api/v55/admin/master';}
@@ -107,10 +101,5 @@ elseif($path==='/api/v1/staff/notifications'){$script='v52.php';$target='/api/v5
 elseif($path==='/api/v1/staff/notifications/read'){$script='v52.php';$target='/api/v52/notifications/read';}
 
 if(!$script||!$target){logV1('INFO','route_not_found');jsonV1(404,['ok'=>false,'message'=>'Endpoint API v1 tidak ditemukan','requestId'=>$requestId]);}
-$full=__DIR__.'/'.$script;
-if(!is_file($full)){logV1('ERROR','handler_missing',['handler'=>$script]);jsonV1(500,['ok'=>false,'message'=>'Handler API belum tersedia','requestId'=>$requestId]);}
-
-session_write_close();
-$_SERVER['REQUEST_URI']=$target.($query!==''?'?'.$query:'');
-logV1('INFO','dispatch',['handler'=>$script,'target'=>$target]);
-require $full;
+$full=__DIR__.'/'.$script;if(!is_file($full)){logV1('ERROR','handler_missing',['handler'=>$script]);jsonV1(500,['ok'=>false,'message'=>'Handler API belum tersedia','requestId'=>$requestId]);}
+session_write_close();$_SERVER['REQUEST_URI']=$target.($query!==''?'?'.$query:'');logV1('INFO','dispatch',['handler'=>$script,'target'=>$target]);require $full;
