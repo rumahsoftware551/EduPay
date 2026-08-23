@@ -1,0 +1,12 @@
+[Unit]
+Description=EduPay Daily Backup
+After=postgresql.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/edupay
+ExecStart=/var/www/edupay/deploy/backup-edupay.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
