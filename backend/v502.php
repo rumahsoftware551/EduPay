@@ -1,0 +1,67 @@
+<?php
+declare(strict_types=1);
+
+$configFile=__DIR__.'/config.php';
+if(!file_exists($configFile)){http_response_code(500);header('Content-Type: application/json');echo json_encode(['ok'=>false,'message'=>'Backend belum dikonfigurasi']);exit;}
+$config=require $configFile;
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+session_name($config['app']['cookie_name']??'edupay_session');
+session_set_cookie_params(['lifetime'=>(int)($config['app']['session_ttl']??43200),'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax']);
+session_start();
+
+function r502(int $status,array $data):never{http_response_code($status);echo json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);exit;}
+function in502():array{$d=json_decode(file_get_contents('php://input')?:'{}',true);return is_array($d)?$d:[];}
+function db502(array $c):PDO{return new PDO($c['db']['dsn'],$c['db']['user'],$c['db']['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);}
+function school502(PDO $pdo,array $c):int{$code=$c['app']['school_code']??'default-school';$q=$pdo->prepare('SELECT id FROM schools WHERE code=?');$q->execute([$code]);$id=$q->fetchColumn();if(!$id)r502(500,['ok'=>false,'message'=>'Sekolah belum tersedia']);return(int)$id;}
+function verifier502():array{if(empty($_SESSION['user']))r502(401,['ok'=>false,'message'=>'Belum login']);$u=$_SESSION['user'];if(!in_array($u['role']??'',['admin','finance'],true))r502(403,['ok'=>false,'message'=>'Verifikasi hanya untuk Admin atau Finance']);return$u;}
+function audit502(PDO $pdo,int $schoolId,int $userId,string $action,string $entityType,string $entityId,array $meta=[]):void{$q=$pdo->prepare('INSERT INTO audit_logs(school_id,user_id,action,entity_type,entity_id,metadata,ip_address,user_agent) VALUES(?,?,?,?,?,?::jsonb,?,?)');$q->execute([$schoolId,$userId,$action,$entityType,$entityId,json_encode($meta,JSON_UNESCAPED_UNICODE),$_SERVER['REMOTE_ADDR']??null,$_SERVER['HTTP_USER_AGENT']??null]);}
+function notify502(PDO $pdo,int $schoolId,int $studentId,string $type,string $title,string $message,string $entityType,string $entityId):void{$q=$pdo->prepare('SELECT guardian_user_id FROM guardian_students WHERE student_id=?');$q->execute([$studentId]);$ins=$pdo->prepare('INSERT INTO notifications(school_id,user_id,student_id,type,title,message,entity_type,entity_id) VALUES(?,?,?,?,?,?,?,?)');foreach($q->fetchAll() as $g)$ins->execute([$schoolId,(int)$g['guardian_user_id'],$studentId,$type,$title,$message,$entityType,$entityId]);}
+function nextReceipt502(PDO $pdo,int $schoolId):string{$q=$pdo->prepare("INSERT INTO receipt_counters(school_id,counter_date,last_number) VALUES(?,CURRENT_DATE,1) ON CONFLICT(school_id,counter_date) DO UPDATE SET last_number=receipt_counters.last_number+1,updated_at=NOW() RETURNING counter_date,last_number");$q->execute([$schoolId]);$r=$q->fetch();return 'PAY-'.date('Ymd',strtotime((string)$r['counter_date'])).'-'.str_pad((string)$r['last_number'],5,'0',STR_PAD_LEFT);}
+function billLock502(PDO $pdo,int $schoolId,int $billId):array{$q=$pdo->prepare("SELECT b.*,s.name student_name,s.guardian_name,s.guardian_phone FROM bills b JOIN students s ON s.id=b.student_id WHERE b.school_id=? AND b.id=? FOR UPDATE OF b");$q->execute([$schoolId,$billId]);$b=$q->fetch();if(!$b)r502(404,['ok'=>false,'message'=>'Tagihan tidak ditemukan']);return$b;}
+function activePayment502(PDO $pdo,int $billId):bool{$q=$pdo->prepare('SELECT 1 FROM payments WHERE bill_id=? AND voided=FALSE LIMIT 1');$q->execute([$billId]);return(bool)$q->fetchColumn();}
+
+$pdo=db502($config);$schoolId=school502($pdo,$config);$path=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/';$method=$_SERVER['REQUEST_METHOD']??'GET';
+
+if($path==='/api/v502/health'&&$method==='GET')r502(200,['ok'=>true,'version'=>'5.0.2','shared_verification'=>true,'whatsapp_reminder'=>true]);
+
+if($path==='/api/v502/verification'&&$method==='GET'){
+  verifier502();
+  $q=$pdo->prepare("SELECT b.id,b.title,b.amount,b.due_date,b.status,b.payment_method,b.proof_name,b.updated_at,s.id student_id,s.name student_name,s.nis,s.guardian_name,s.guardian_phone,c.name class_name
+    FROM bills b JOIN students s ON s.id=b.student_id LEFT JOIN classes c ON c.id=s.class_id
+    WHERE b.school_id=? AND b.status='pending' ORDER BY b.updated_at ASC,b.id ASC");$q->execute([$schoolId]);$rows=[];
+  foreach($q->fetchAll() as $r)$rows[]=['id'=>(int)$r['id'],'studentId'=>(int)$r['student_id'],'studentName'=>$r['student_name'],'nis'=>$r['nis'],'className'=>$r['class_name'],'guardianName'=>$r['guardian_name']??'','guardianPhone'=>$r['guardian_phone']??'','title'=>$r['title'],'amount'=>(float)$r['amount'],'due'=>$r['due_date'],'status'=>$r['status'],'paymentMethod'=>$r['payment_method'],'proofName'=>$r['proof_name'],'updatedAt'=>$r['updated_at']];
+  r502(200,['ok'=>true,'items'=>$rows,'count'=>count($rows),'serverTime'=>date(DATE_ATOM)]);
+}
+
+if(preg_match('#^/api/v502/bills/(\d+)/approve$#',$path,$m)&&$method==='POST'){
+  $u=verifier502();$billId=(int)$m[1];$pdo->beginTransaction();
+  try{
+    $b=billLock502($pdo,$schoolId,$billId);
+    if($b['status']!=='pending')r502(409,['ok'=>false,'message'=>'Tagihan tidak lagi menunggu verifikasi']);
+    if(trim((string)$b['proof_name'])==='')r502(409,['ok'=>false,'message'=>'Bukti transfer belum tersedia']);
+    if(activePayment502($pdo,$billId))r502(409,['ok'=>false,'message'=>'Pembayaran sudah diproses oleh petugas lain']);
+    $receipt=nextReceipt502($pdo,$schoolId);$external='server:'.$receipt;
+    $q=$pdo->prepare('INSERT INTO payments(school_id,external_id,bill_id,student_id,amount,method,paid_at,verified_by,receipt,voided) VALUES(?,?,?,?,?,?,NOW(),?,?,FALSE) RETURNING id');
+    $q->execute([$schoolId,$external,$billId,$b['student_id'],$b['amount'],'Transfer',$u['id'],$receipt]);$paymentId=(int)$q->fetchColumn();
+    $pdo->prepare("UPDATE bills SET status='paid',payment_method='Transfer',updated_at=NOW() WHERE id=?")->execute([$billId]);
+    audit502($pdo,$schoolId,(int)$u['id'],'proof.approved','bill',(string)$billId,['payment_id'=>$paymentId,'receipt'=>$receipt,'role'=>$u['role']]);
+    notify502($pdo,$schoolId,(int)$b['student_id'],'payment','Pembayaran dikonfirmasi','Pembayaran '.$b['title'].' telah diverifikasi dan dinyatakan lunas. Kwitansi: '.$receipt,'payment',(string)$paymentId);
+    $pdo->commit();r502(200,['ok'=>true,'message'=>'Bukti diterima dan pembayaran dinyatakan lunas','receipt'=>$receipt]);
+  }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($e instanceof PDOException)r502(500,['ok'=>false,'message'=>'Transaksi database gagal']);throw$e;}
+}
+
+if(preg_match('#^/api/v502/bills/(\d+)/reject$#',$path,$m)&&$method==='POST'){
+  $u=verifier502();$in=in502();$reason=trim((string)($in['reason']??''));$billId=(int)$m[1];
+  if(mb_strlen($reason)<3)r502(422,['ok'=>false,'message'=>'Alasan penolakan wajib diisi minimal 3 karakter']);
+  $pdo->beginTransaction();
+  try{
+    $b=billLock502($pdo,$schoolId,$billId);if($b['status']!=='pending')r502(409,['ok'=>false,'message'=>'Tagihan tidak lagi menunggu verifikasi']);
+    $oldProof=$b['proof_name'];$pdo->prepare("UPDATE bills SET status='unpaid',payment_method=NULL,proof_name=NULL,updated_at=NOW() WHERE id=?")->execute([$billId]);
+    audit502($pdo,$schoolId,(int)$u['id'],'proof.rejected','bill',(string)$billId,['reason'=>$reason,'proof'=>$oldProof,'role'=>$u['role']]);
+    notify502($pdo,$schoolId,(int)$b['student_id'],'warning','Bukti pembayaran ditolak','Bukti pembayaran '.$b['title'].' ditolak. Alasan: '.$reason,'bill',(string)$billId);
+    $pdo->commit();r502(200,['ok'=>true,'message'=>'Bukti pembayaran ditolak']);
+  }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($e instanceof PDOException)r502(500,['ok'=>false,'message'=>'Transaksi database gagal']);throw$e;}
+}
+
+r502(404,['ok'=>false,'message'=>'Endpoint V5.0.2 tidak ditemukan']);
