@@ -41,6 +41,8 @@ session_set_cookie_params([
 ]);
 session_start();
 if(empty($_SESSION['csrf_v1']))$_SESSION['csrf_v1']=bin2hex(random_bytes(32));
+// V5.3 is kept as a proven handler behind the gateway. Use one token for both layers.
+$_SESSION['csrf_v53']=(string)$_SESSION['csrf_v1'];
 
 $path=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/';
 $query=parse_url($_SERVER['REQUEST_URI']??'',PHP_URL_QUERY)?:'';
