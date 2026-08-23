@@ -1,0 +1,12 @@
+/* EduPay V4.6 - Wali Kelas sync/import */
+.homeroom-actions-v46{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.homeroom-sync-strip-v46{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-7px 0 14px;padding:10px 13px;border:1px solid #dce9ff;background:#f7faff;border-radius:12px;color:#60728f;font-size:11px}
+.homeroom-sync-strip-v46 b{color:#1d5bd3;font-size:14px}
+.homeroom-import-table-v46{max-height:330px;margin-top:12px}
+.support-email-v46{display:block;margin-top:2px;color:#2563eb;text-decoration:none;font-size:9px;line-height:1.35;word-break:break-all;font-weight:700}
+.support-email-v46:hover{text-decoration:underline}
+@media(max-width:720px){
+  .homeroom-actions-v46{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+  .homeroom-actions-v46 .btn{min-width:0;font-size:10px;padding:8px}
+  .homeroom-sync-strip-v46{align-items:flex-start;flex-direction:column;font-size:10px;padding:9px 10px}
+}
