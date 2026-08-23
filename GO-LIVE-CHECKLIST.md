@@ -1,88 +1,116 @@
 # EduPay — Go-Live & Commercial Readiness Checklist
 
-Status audit: **BELUM SIAP DIJUAL / BELUM SIAP PRODUKSI** sampai seluruh item P0 selesai.
+Status audit: **MENUJU COMMERCIAL MASTER**. V5.3 sudah mengubah CRUD Admin utama menjadi server-first, tetapi release komersial masih menunggu security hardening, konsolidasi core, backup/restore production, dan UAT.
 
 ## P0 — Wajib sebelum produksi
-- [ ] Backend server-side penuh (Admin CRUD masih transisi cache LocalStorage → PostgreSQL)
-- [x] Database PostgreSQL
+- [x] PostgreSQL sebagai database operasional utama
 - [x] Password production di-hash server-side
-- [ ] Session/auth server-side + CSRF protection (session sudah server-side; CSRF belum)
 - [x] RBAC dasar Admin / Finance / Wali di backend
-- [ ] Isolasi data per sekolah (multi-tenant) jika dijual ke banyak sekolah
-- [ ] CRUD siswa server-first
-- [ ] CRUD kelas/rombel server-first
-- [ ] CRUD jenis pembayaran server-first
-- [ ] Tagihan individual & massal server-first
-- [x] Pembayaran Cash / Transfer / QRIS dicatat server-first sejak V5.0
-- [ ] Upload bukti transfer benar-benar tersimpan di server/object storage
-- [ ] Validasi ukuran/jenis file upload + random filename
-- [ ] Finance dapat melihat file bukti transfer asli sebelum approve/reject
-- [x] Nomor kwitansi unik dibuat server-side sejak V5.0
-- [x] Void pembayaran menyimpan alasan + user + timestamp sejak V5.0
-- [ ] Audit log immutable untuk seluruh transaksi keuangan (event payment/reject/void sudah dicatat; hardening masih perlu)
+- [x] CRUD siswa server-first sejak V5.3
+- [x] CRUD kelas/rombel server-first sejak V5.3
+- [x] CRUD wali kelas server-first sejak V5.3
+- [x] CRUD jenis pembayaran server-first sejak V5.3
+- [x] Tagihan individual & massal server-first sejak V5.3
+- [x] Import siswa server-first sejak V5.3
+- [x] Import wali kelas server-first sejak V5.3
+- [x] Pembayaran Cash / Transfer / QRIS server-first sejak V5.0
+- [x] Upload bukti transfer tersimpan private di VPS sejak V5.1
+- [x] Validasi file JPG/PNG/PDF, max 5 MB, random filename sejak V5.1
+- [x] Admin/Finance dapat melihat file bukti asli sebelum approve/reject
+- [x] Verifikasi bukti dapat dilakukan Admin dan Finance
+- [x] Nomor kwitansi unik dibuat server-side
+- [x] Void pembayaran menyimpan alasan + user + timestamp
 - [x] Proteksi double-processing pembayaran dengan row lock PostgreSQL
-- [x] Proteksi perubahan pembayaran lunas pada endpoint Finance V5.0
-- [ ] Backup database otomatis terjadwal + uji restore (backup pre-upgrade sudah tersedia)
-- [ ] HTTPS aktif dan security headers (HTTPS aktif; headers hardening belum lengkap)
-- [x] Rate limiting/lockout login dasar
-- [x] Reset password wali dengan token server
+- [x] Notifikasi in-app Wali, Admin dan Finance berbasis database
+- [x] Aktivasi/reset password wali dengan token server
 - [x] Logout/session expiry server-side
-- [ ] Error logging terpusat tanpa membocorkan data sensitif
-- [ ] UAT seluruh role
+- [ ] CSRF protection untuk seluruh endpoint mutasi (V5.3 sudah aktif pada Admin Commercial Core; endpoint legacy masih perlu dikonsolidasi)
+- [ ] Hapus seluruh demo credential/fallback auth lokal dari source runtime
+- [ ] Session UI tidak boleh mengandalkan LocalStorage untuk authorization
+- [ ] Security headers production lengkap
+- [ ] Error logging terpusat tanpa data sensitif
+- [ ] Audit log immutable/hardening untuk seluruh transaksi penting
+- [ ] Backup database + proof storage otomatis terjadwal dan uji restore
+- [ ] Isolasi data per sekolah / model deployment komersial final
+- [ ] UAT seluruh role dan regression test
 
-## P1 — Wajib untuk operasional sekolah yang baik
-- [ ] Tahun ajaran & semester aktif
+## P1 — Operasional sekolah
 - [x] Master kelas/rombel editable
+- [x] Master wali kelas editable
 - [x] Import siswa Excel/CSV
 - [x] Import wali kelas Excel/CSV
+- [x] Tagihan per siswa / kelas / semua siswa
+- [x] Filter dan pencarian tabel client-side
+- [x] Reminder WhatsApp ke wali
+- [x] Pengaturan identitas sekolah dasar sejak V5.3
+- [x] Tahun ajaran & semester aktif pada profil sekolah sejak V5.3
 - [ ] Kenaikan kelas / kelulusan / alumni
 - [ ] Diskon/beasiswa/potongan
 - [ ] Cicilan pembayaran
-- [x] Tagihan per kelas/semua siswa/siswa individual pada UI operasional
-- [x] Filter dan pencarian pada tabel
-- [ ] Server-side pagination/search untuk data besar
+- [ ] Server-side pagination/search/filter untuk data besar
 - [ ] Laporan penerimaan per tanggal/metode/kelas server-side
 - [ ] Laporan tunggakan per siswa/kelas server-side
 - [ ] Export Excel/PDF server-side
-- [ ] Cetak kwitansi resmi dengan identitas sekolah
-- [ ] Pengaturan profil sekolah, logo, alamat, rekening/QRIS
-- [ ] Manajemen user dan role
-- [x] Notifikasi in-app wali berbasis database/polling
+- [ ] Cetak kwitansi resmi dengan identitas/logo sekolah
+- [ ] Upload logo sekolah dari panel (V5.3 sementara mendukung URL logo)
+- [ ] Manajemen user Admin/Finance dari panel
 
-## P2 — Commercial readiness
-- [ ] Setup wizard sekolah baru production
-- [ ] Multi-tenant/subdomain per sekolah
-- [ ] Paket berlangganan/lisensi
-- [ ] Branding/custom logo sekolah
-- [ ] Terms of Service + Privacy Policy
-- [ ] Backup/restore dari panel owner
-- [ ] Monitoring uptime
-- [x] Health check backend
+## P2 — Commercial Master
+- [x] Profil sekolah tanpa edit source: nama, NPSN, alamat, kontak, rekening, QRIS, tahun ajaran, semester, support email
+- [ ] Konsolidasi frontend: hentikan pola banyak override file versi lama
+- [ ] Konsolidasi API menjadi satu `/api/v1/*`
+- [ ] Installer fresh deployment satu perintah
+- [ ] Wizard onboarding sekolah baru production
+- [ ] Pilihan model: single-instance per sekolah (disarankan untuk release awal)
+- [ ] Backup/restore dari tool maintenance
+- [ ] Monitoring uptime dan disk/database health
 - [ ] Staging environment
-- [ ] CI/CD dan rollback
-- [ ] Manual pengguna Admin/Finance/Wali
-- [ ] SLA/support process
+- [ ] CI/CD + rollback release
+- [ ] Manual Admin / Finance / Wali
+- [ ] Terms of Service + Privacy Policy
+- [ ] Versioning & release notes resmi
+- [ ] UAT PASS + sign-off
 
 ## Progress versi
 
 ### V4.9 Stability
 - [x] Snapshot PostgreSQL Admin/Finance
 - [x] Polling dan refresh saat tab kembali aktif
-- [x] Delta sync untuk mencegah cache lama menimpa perubahan server
-- [x] Indikator VPS tersinkron / gagal sinkron
+- [x] Delta sync transition layer
+- [x] Indikator status VPS
 
 ### V5.0 Finance Transaction Safety
-- [x] Approve pembayaran server-first
-- [x] Reject bukti server-first + alasan wajib
-- [x] Pembayaran manual Cash/Transfer/QRIS server-first
-- [x] Row locking mencegah double payment
-- [x] Nomor kwitansi dibuat server per hari
-- [x] Void server-first + alasan + user + timestamp
-- [x] Riwayat wali membaca ledger pembayaran server
-- [x] Notifikasi wali untuk payment/reject/void
+- [x] Approve/reject server-first
+- [x] Payment server-first
+- [x] Row locking anti double payment
+- [x] Receipt server-side
+- [x] Void server-side + reason
+- [x] Riwayat wali dari payment ledger
+
+### V5.1 Proof Storage
+- [x] File bukti private VPS
+- [x] MIME/size validation
+- [x] Viewer untuk Admin/Finance
+
+### V5.2 Staff Operations
+- [x] Verifikasi bukti Admin + Finance
+- [x] WA Reminder
+- [x] Notifikasi Admin/Finance
+- [x] Menu Migrasi disembunyikan dari operasional
+
+### V5.3 Commercial Core
+- [x] CRUD Siswa server-first
+- [x] CRUD Kelas server-first
+- [x] CRUD Wali Kelas server-first
+- [x] CRUD Jenis Pembayaran server-first
+- [x] Tagihan individual/massal server-first
+- [x] Import siswa/wali kelas server-first
+- [x] CSRF untuk endpoint Admin V5.3
+- [x] Pengaturan Sekolah di PostgreSQL
+- [x] LocalStorage Admin diposisikan sebagai cache, bukan sumber mutasi
 
 ## Berikutnya
-1. **V5.1 Proof Storage** — simpan file JPG/PNG/PDF asli secara private di VPS.
-2. **V5.2 Admin Server CRUD** — siswa/kelas/fee/tagihan langsung API tanpa local-first.
-3. **V5.3 Security Hardening** — CSRF, headers, hapus demo credential/fallback lokal, error logging.
-4. **V6.0 Commercial** — multi-tenant, onboarding sekolah, backup/restore, UAT, CI/CD.
+1. **V5.4 Security & Core Consolidation** — CSRF seluruh mutation endpoint, hapus demo auth/local fallback, security headers, centralized error handling, mulai `/api/v1`.
+2. **V5.5 Reports & Scale** — server-side reports, pagination/search, export, dashboard queries untuk data besar.
+3. **V5.6 Backup/Restore & Branding** — scheduled backup DB+proofs, restore test, logo upload, kwitansi resmi.
+4. **V6.0 Commercial Master** — installer/onboarding, staging, CI/CD, UAT, documentation, release packaging.
